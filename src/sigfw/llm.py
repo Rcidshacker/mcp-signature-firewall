@@ -86,6 +86,10 @@ class ChatClient:
         self._sleep = sleep
         self._rng = rng
 
+    @property
+    def settings(self) -> Settings:
+        return self._s
+
     def close(self) -> None:
         self._http.close()
 
