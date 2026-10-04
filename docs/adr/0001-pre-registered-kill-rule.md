@@ -56,3 +56,16 @@ The README describes the project as a measured cost and latency optimizer for an
 
 1. **Proof of pre-registration.** The evidence that this rule predates any result is the GitHub server push time of the first commit, 2026-10-04T15:28:08Z. Commit author dates are local and editable and are not proof. Every change after that push is a dated amendment, never a rewrite.
 2. **Shadowing set size.** The hand-written tool-shadowing set is 35 attacks, not about 21, so that 30 or more survive dedupe and the family keeps its kill power. The author writes them, varying technique, length, position in the description (start, middle, end) and tone. They are committed and pushed before any prompt exists.
+
+## Amendment 3 (2026-10-04, before any model call)
+
+1. **Probe calls are non-measurement.** They use no dataset item and their outputs feed no result.
+2. **Smoke test and determinism probe** use dev items only, never shadowing, held-out or frozen items.
+3. **Shadowing set.** It is one of the four macro-average families and also reported as its own row.
+4. **FP gate is LLM-alone.** The cascade false-positive rate (signature library on) is a separate, non-gating row.
+5. **Error scoring is pessimistic.** An error counts as a miss for detection and as flagged for FP. A run with more than 1% errors after retry is invalid and is rerun as a new experiment.
+6. **Gate size.** The gate code rejects n other than 200. A quoting slice under 200 after dedupe means writing more items, never shrinking the gate.
+7. **Normalizer.** `NORMALIZER_VERSION=1` is frozen as NFKC, strip invisibles, and surface Unicode tag characters. Decoding is version 2 and runs after the verdict.
+8. **Exploratory stream.** The exact-dedupe stream is labelled non-gating.
+9. **Embedder fallback.** If the key probe shows no working embedding model, the matcher is char-5-gram containment. The choice is recorded in `protocol.toml` before any call-rate run.
+10. **Proof of timing.** The pre-registration proof is the GitHub push timestamp, not commit author dates.
