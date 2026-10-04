@@ -1,15 +1,25 @@
 .env
 .env.*
+!.env.example
 *.key
 __pycache__/
 .venv/
 venv/
 *.pyc
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 node_modules/
 data/raw/
 data/external/
+.cache/
+runs/
+var/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 .ignore
+
+# unlazy local state
+.unlazy/
+.unlazy-hook-state.json
