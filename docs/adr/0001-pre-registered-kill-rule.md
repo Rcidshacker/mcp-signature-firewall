@@ -51,3 +51,8 @@ The README describes the project as a measured cost and latency optimizer for an
 2. **Call rate is reported, not gating.** The call-rate curve (share of screened texts that needed an LLM verdict, over the frozen-set stream) is reported whether or not it falls. A flat curve is a valid null result and does not change the kill verdict.
 3. **Model-ID contingency.** If the Nebius Token Factory ID for Nemotron 3.5 Lightning is not confirmed by 2026-10-06, the kill test runs on build.nvidia. The final submission run is then re-measured on the Token Factory model and reported as a separate result. The 2026-10-09 date does not move.
 4. **Per-channel rows.** Results are also reported per channel: tool description, tool result, other (user-prompt style). The kill rule itself is not split by channel.
+
+## Amendment 2 (2026-10-04, before any data or model run existed)
+
+1. **Proof of pre-registration.** The evidence that this rule predates any result is the GitHub server push time of the first commit, 2026-10-04T15:28:08Z. Commit author dates are local and editable and are not proof. Every change after that push is a dated amendment, never a rewrite.
+2. **Shadowing set size.** The hand-written tool-shadowing set is 35 attacks, not about 21, so that 30 or more survive dedupe and the family keeps its kill power. The author writes them, varying technique, length, position in the description (start, middle, end) and tone. They are committed and pushed before any prompt exists.
