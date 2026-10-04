@@ -9,3 +9,6 @@ venv/
 node_modules/
 data/raw/
 data/external/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
