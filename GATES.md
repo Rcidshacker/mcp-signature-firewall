@@ -7,7 +7,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=70ea310a9e8f219e4729c7e296e8bd72cc0c8436dd55ea6fdffddfd793751ade; output-bytes=31; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=34c6f4d59752935e401066384450ce124eb34a59d029d9118f905748607ccc54; output-bytes=31; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
@@ -17,7 +17,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=d9a5631f7d87a741fbecc3236286d1792d22d349ff13846d71cdc9217307bb76; output-bytes=44; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=2ea17864b2fae3692d354a40d996a3e5e904fbb9b766aa2ba1f83ab52a36747d; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"
@@ -38,3 +38,16 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
   CHECK: uv run python scripts/gates.py no-keys
   EXPECT: NO_KEYS_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=6e79e496f78808e57ba50b53a174598ef5751a2b6f8bca5c76beeac297dd321f; exit=0; EXPECT=matched; output-sha256=a7bf2c825f80ddfd5ea35c36ff572d3ca6e1d79692c36c34d1e41037bcb1daec; output-bytes=12; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+
+- [x] G8: no prompt file precedes the pinned shadowing commit (strict ancestor, and the set passes check-own at that commit)
+  CHECK: uv run python scripts/gates.py prompt-order
+  EXPECT: PROMPT_ORDER_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=e1db8aaf8597f8f801b358b592a5beb100e73fbe92536215b2fff6b78c6479d6; exit=0; EXPECT=matched; output-sha256=acdc2f85a162fa2a3a081cb0ad25f9d6a3b137a708e91f05daa3773e42b52c7a; output-bytes=51; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+
+- [ ] G9: the author-written shadowing set is complete (n is 35 or more, no duplicates or near-duplicates) [pending M1, author task]
+  CHECK: uv run sigfw data check-own
+  EXPECT: shadowing n=(3[5-9]|[4-9][0-9])
+
+- [ ] G10: the protocol check enforces the ordering and passes [pending M4: `sigfw eval protocol --check` fails unless G8 holds]
+  CHECK: uv run sigfw eval protocol --check
+  EXPECT: PROTOCOL_OK

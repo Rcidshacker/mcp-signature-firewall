@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 KEY_PATTERN = r"nvapi-[A-Za-z0-9_-]{20,}"
 
@@ -32,11 +33,20 @@ def tests_pass() -> bool:
     return r.returncode == 0
 
 
+def prompt_order() -> bool:
+    from sigfw.ordering import check_prompt_order
+
+    ok, message = check_prompt_order(Path.cwd())
+    print(message, file=sys.stderr)
+    return ok
+
+
 CHECKS = {
     "tests": (tests_pass, "TESTS_OK"),
     "env-ignored": (env_ignored, "ENV_IGNORED_OK"),
     "env-example-tracked": (env_example_not_ignored, "ENV_EXAMPLE_OK"),
     "no-keys": (no_keys_in_tree, "NO_KEYS_OK"),
+    "prompt-order": (prompt_order, "PROMPT_ORDER_OK"),
 }
 
 
