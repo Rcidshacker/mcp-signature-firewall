@@ -44,3 +44,10 @@ The README describes the project as a measured cost and latency optimizer for an
 
 - The false-positive gate uses a 95% upper bound while detection uses point estimates. With 20 examples a family at 70% has a lower bound near 48%, so the rule is strict on false positives and lenient on detection. A stricter detection gate would kill almost any project, so this is accepted and stated.
 - The numbers are a starting guess fixed in advance, not tuned to results. They replace an earlier flat 5% false-positive rule that ignored sampling noise.
+
+## Amendment 1 (2026-10-04, before any data or model run existed)
+
+1. **What detection measures.** Held-out families are never in the signature library, so the kill-rule detection number is the LLM verdict alone, with the signature library off. The detection average is a macro-average over the four held-out families, not a pooled rate.
+2. **Call rate is reported, not gating.** The call-rate curve (share of screened texts that needed an LLM verdict, over the frozen-set stream) is reported whether or not it falls. A flat curve is a valid null result and does not change the kill verdict.
+3. **Model-ID contingency.** If the Nebius Token Factory ID for Nemotron 3.5 Lightning is not confirmed by 2026-10-06, the kill test runs on build.nvidia. The final submission run is then re-measured on the Token Factory model and reported as a separate result. The 2026-10-09 date does not move.
+4. **Per-channel rows.** Results are also reported per channel: tool description, tool result, other (user-prompt style). The kill rule itself is not split by channel.
