@@ -69,3 +69,15 @@ The README describes the project as a measured cost and latency optimizer for an
 8. **Exploratory stream.** The exact-dedupe stream is labelled non-gating.
 9. **Embedder fallback.** If the key probe shows no working embedding model, the matcher is char-5-gram containment. The choice is recorded in `protocol.toml` before any call-rate run.
 10. **Proof of timing.** The pre-registration proof is the GitHub push timestamp, not commit author dates.
+
+## Amendment 4 (2026-10-04, before any measurement run; no model call since the probe)
+
+This extends the "Measured system" section above. That section's text is not edited, in keeping with Amendment 2.
+
+1. **Request settings that are part of the measured system.** Chosen from the endpoint probe on a fixed non-dataset string (`docs/api-probe-2026-10-04.md`, `docs/api-notes-2026-10-04.md`), not from any dataset item:
+   - `chat_template_kwargs: {"enable_thinking": false}`, carried as `LLM_EXTRA_BODY`. Without it Lightning spent a 64-token budget on visible reasoning and returned no JSON; with it the probe reply took 5 tokens.
+   - `max_tokens = 256` for classifier calls. This is headroom over the 5-token probe reply plus a bounded `span`; it was not tuned on data. A reply that stops at the cap (`finish_reason=length`) is an error, scored pessimistically under Amendment 3.5.
+   - JSON mode (`response_format: {"type": "json_object"}`). The probe showed Lightning returns valid JSON with it. The reply must still pass strict `{verdict, family, span}` parsing; any parse failure is an error, never benign.
+   - Temperature 0 (unchanged).
+2. **Changes after the kill run.** Any change to these settings, the model, the endpoint or the prompt after the kill run is a new experiment, reported separately. It does not revive the original verdict.
+3. **Unverified, stated now.** Whether Nebius Token Factory accepts `chat_template_kwargs.enable_thinking`, and whether its Nemotron 3.5 Lightning serves the same weights as build.nvidia, are not verified (no Nebius key has been used yet). If this is not confirmed by 2026-10-06, the contingency in Amendment 1.3 applies unchanged: the kill test runs on build.nvidia, the Token Factory run is a separate re-measurement, and the 2026-10-09 date does not move.
