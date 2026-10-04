@@ -13,6 +13,7 @@ import httpx
 
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
+from sigfw.owndata import check_shadowing
 from sigfw.probe import DEFAULT_CANDIDATES, Candidate, render_markdown, run_probe
 
 
@@ -23,7 +24,30 @@ def _build_parser() -> argparse.ArgumentParser:
     probe = llm.add_parser("probe-models", help="one tiny call per candidate model; writes a markdown report")
     probe.add_argument("--out", type=Path, default=None, help="default: docs/api-probe-<date>.md")
     probe.add_argument("--date", default=None, help="YYYY-MM-DD (default: today, UTC)")
+    data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
+    own = data.add_parser("check-own", help="validate the hand-written shadowing set")
+    own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     return p
+
+
+def _check_own(args: argparse.Namespace) -> int:
+    path: Path = args.path
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print("shadowing n=0")
+        print(f"ERROR file not found: {path}")
+        return 1
+    except UnicodeDecodeError:
+        print("shadowing n=0")
+        print(f"ERROR file is not valid UTF-8: {path}")
+        return 1
+    report = check_shadowing(raw)
+    print(f"shadowing n={report.n}")
+    for prefix, lines in (("NOTE", report.notes), ("WARN", report.warnings), ("ERROR", report.errors)):
+        for line in lines:
+            print(f"{prefix} {line}")
+    return 0 if report.ok else 1
 
 
 def _probe_models(args: argparse.Namespace, env: Mapping[str, str], transport: httpx.BaseTransport | None) -> int:
@@ -63,5 +87,7 @@ def main(
     environment = os.environ if env is None else env
     if args.group == "llm" and args.cmd == "probe-models":
         return _probe_models(args, environment, transport)
+    if args.group == "data" and args.cmd == "check-own":
+        return _check_own(args)
     print("sigfw: unknown command", file=sys.stderr)
     return 2
