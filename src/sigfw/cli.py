@@ -29,6 +29,8 @@ def _build_parser() -> argparse.ArgumentParser:
     data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
     own = data.add_parser("check-own", help="validate the hand-written shadowing set")
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
+    add = data.add_parser("add-own", help="append one author=human shadowing row from typed answers")
+    add.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
     fetch.add_argument("--dest", type=Path, default=Path("data/raw"))
     for name, text in (
@@ -117,6 +119,8 @@ def main(
         return _probe_models(args, environment, transport)
     if args.group == "data" and args.cmd == "check-own":
         return _check_own(args)
+    if args.group == "data" and args.cmd == "add-own":
+        return datacmd.add_own(args.path)
     if args.group == "data" and args.cmd == "fetch":
         return _fetch(args)
     if args.group == "data" and args.cmd == "stats":

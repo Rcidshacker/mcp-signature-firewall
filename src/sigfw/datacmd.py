@@ -9,6 +9,7 @@ from typing import Any
 
 from sigfw.dedupe import Dropped, dedupe
 from sigfw.items import HELD_OUT, Item, LoaderError, canonicalize, load_all, load_third_party
+from sigfw.owndata import CHANNEL, CLAUSE_POSITIONS, FAMILY, MIN_N, check_shadowing
 from sigfw.split import build_manifest, find_leaks, verify_manifest
 
 DEV_FLOOR = 30  # design aim: about 10 families with 30 or more examples each after dedupe
@@ -42,6 +43,66 @@ def stats(raw: Path, shadowing: Path) -> int:
     print(f"STATS items={len(kept)} families={len(after)} heldout={heldout}")
     if note:
         print(f"NOTE {note}")
+    return 0
+
+
+def _ask(label: str, allowed: tuple[str, ...] | None = None) -> str:
+    while True:
+        answer = input(f"{label}: ").strip()
+        if not answer:
+            print(f"{label} must not be empty")
+        elif allowed and answer not in allowed:
+            print(f"{label} must be one of {'|'.join(allowed)}")
+        else:
+            return answer
+
+
+def _ask_text() -> str:
+    """Multi-line text, exactly as typed, ended by a line containing only a full stop."""
+    while True:
+        lines = [input("text (finish with a line containing only .): ")]
+        while lines[-1] != ".":
+            lines.append(input())
+        text = "\n".join(lines[:-1])
+        if text.strip():
+            return text
+        print("text must not be empty")
+
+
+def add_own(path: Path) -> int:
+    """Append one author=human row from typed answers. Never generates, suggests or edits text."""
+    try:
+        row = {
+            "id": _ask("id"),
+            "author": "human",
+            "channel": CHANNEL,
+            "family": FAMILY,
+            "technique": _ask("technique"),
+            "clause_position": _ask("clause_position", CLAUSE_POSITIONS),
+            "host_tool": _ask("host_tool"),
+            "target_tool": _ask("target_tool"),
+            "text": _ask_text(),
+        }
+    except EOFError:
+        print("cancelled: nothing written")
+        return 1
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    prefix = "\n" if existing and not existing.endswith("\n") else ""
+    line = json.dumps(row, ensure_ascii=False)
+    report = check_shadowing(existing + prefix + line + "\n")
+    blocking = [e for e in report.errors if not e.startswith("n=")]  # n below the minimum is expected while writing
+    if blocking:
+        for e in blocking:
+            print(f"ERROR {e}")
+        print("nothing written")
+        return 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as f:
+        f.write(prefix + line + "\n")
+    print(f"ADDED id={row['id']}")
+    print(f"shadowing n={report.n}")
+    if report.n < MIN_N:
+        print(f"NOTE {MIN_N - report.n} more row(s) needed to reach {MIN_N}")
     return 0
 
 

@@ -29,7 +29,9 @@ One JSON object per line, UTF-8, LF. Fields:
 `word_count` and `length_bucket` are **computed** from `text` and must never be stored: short is 25 words or fewer,
 medium 26 to 45, long 46 or more. A row that stores them is rejected as an unknown field.
 
-To add your own rows: copy a row layout from `shadowing.template.jsonl` (its `TEMPLATE` rows are never counted), append
+Quickest way: `uv run sigfw data add-own` asks for each field, takes the text exactly as you type it (end with a line containing only `.`), appends one `author=human` row and refuses it if it is a duplicate or invalid. It never generates or suggests text.
+
+Or edit the file directly: copy a row layout from `shadowing.template.jsonl` (its `TEMPLATE` rows are never counted), append
 your rows with `author=human`, then run `uv run sigfw data check-own`. It must print `shadowing n=` with the total (35 or
 more), exit 0, and report no near-duplicate pairs (char-5-gram Jaccard 0.85 or higher, checked across **all** rows
 whatever the author). It prints counts by author, technique, length bucket and clause position, the length by position
