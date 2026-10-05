@@ -29,6 +29,7 @@ class Item:
     channel: str  # tool_description | tool_result
     label: str  # attack (benign items arrive with the quoting slices)
     text: str
+    author: str = ""  # own text only: human | gpt (the shadowing slices); empty for third-party items
 
 
 def _read_json(path: Path) -> Any:
@@ -85,7 +86,7 @@ def load_shadowing(path: Path) -> list[Item]:
         raise LoaderError(f"shadowing set fails check-own: {report.errors[0]}")
     rows = [json.loads(line) for line in raw.split("\n") if line.strip()]
     return [
-        Item(f"own/shadowing/{r['id']}", "own", "shadowing", "tool_description", "attack", r["text"])
+        Item(f"own/shadowing/{r['id']}", "own", "shadowing", "tool_description", "attack", r["text"], r["author"])
         for r in rows
         if r["technique"].strip() != TEMPLATE_TECHNIQUE
     ]

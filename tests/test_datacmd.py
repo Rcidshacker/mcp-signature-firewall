@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -93,3 +94,39 @@ def test_leakage_check_refuses_a_stale_manifest(tmp_path: Path, capsys: pytest.C
     path.write_text(path.read_text(encoding="utf-8").replace("amber", "zzzzz"), encoding="utf-8")
     code, out = run(["leakage-check"], tmp_path, raw, own, capsys)
     assert code == 1 and "MANIFEST_FAIL" in out
+
+
+def test_manifest_records_authors_and_the_shadowing_files(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    raw, own = make_raw(tmp_path)
+    (own.parent / "sources").mkdir()
+    (own.parent / "sources" / "gset_v1.json").write_bytes(b'{"rows": []}\n')
+    (own.parent / "shadowing.commit").write_text("a" * 40 + "\n", encoding="utf-8")
+    run(["split"], tmp_path, raw, own, capsys)
+    manifest = json.loads((tmp_path / "split.json").read_text(encoding="utf-8"))
+    info = manifest["shadowing"]
+    assert info["authors"] == {"gpt": 28, "human": 7}  # make_row: every fifth row is human
+    assert info["commit"] == "a" * 40
+    assert info["gset_v1_sha256"] == hashlib.sha256(b'{"rows": []}\n').hexdigest()
+    shadow_items = [i for i in manifest["items"] if i["family"] == "shadowing"]
+    assert {i["author"] for i in shadow_items} == {"human", "gpt"}
+    assert all("author" not in i for i in manifest["items"] if i["family"] != "shadowing")
+
+
+def test_changing_the_pinned_commit_after_the_split_fails_verify(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    raw, own = make_raw(tmp_path)
+    commit = own.parent / "shadowing.commit"
+    commit.write_text("a" * 40 + "\n", encoding="utf-8")
+    run(["split"], tmp_path, raw, own, capsys)
+    assert run(["split", "--verify"], tmp_path, raw, own, capsys)[0] == 0
+    commit.write_text("b" * 40 + "\n", encoding="utf-8")
+    code, out = run(["split", "--verify"], tmp_path, raw, own, capsys)
+    assert code == 1 and out.startswith("MANIFEST_FAIL")
+
+
+def test_a_malformed_commit_file_is_refused(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    raw, own = make_raw(tmp_path)
+    (own.parent / "shadowing.commit").write_text("not-a-hash\n", encoding="utf-8")
+    code, out = run(["split"], tmp_path, raw, own, capsys)
+    assert code == 1 and "40-character" in out

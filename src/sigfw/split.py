@@ -23,10 +23,10 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
-def build_manifest(kept: list[Item], dropped: list[Dropped]) -> dict[str, Any]:
+def build_manifest(kept: list[Item], dropped: list[Dropped], shadowing: dict[str, Any] | None = None) -> dict[str, Any]:
     """Ids, families, splits and hashes only: no third-party text. Same input gives the same manifest."""
     counts = Counter(i.family for i in kept)
-    return {
+    manifest: dict[str, Any] = {
         "manifest_version": MANIFEST_VERSION,
         "normalizer_version": NORMALIZER_VERSION,
         "ngram": NGRAM,
@@ -48,6 +48,7 @@ def build_manifest(kept: list[Item], dropped: list[Dropped]) -> dict[str, Any]:
                 "label": i.label,
                 "split": split_of(i),
                 "sha256": _sha(i.text),
+                **({"author": i.author} if i.author else {}),
             }
             for i in sorted(kept, key=lambda i: i.id)
         ],
@@ -56,6 +57,9 @@ def build_manifest(kept: list[Item], dropped: list[Dropped]) -> dict[str, Any]:
             for d in sorted(dropped, key=lambda d: d.id)
         ],
     }
+    if shadowing is not None:
+        manifest["shadowing"] = shadowing
+    return manifest
 
 
 def verify_manifest(manifest: dict[str, Any], kept: list[Item]) -> tuple[bool, str]:
@@ -67,13 +71,14 @@ def verify_manifest(manifest: dict[str, Any], kept: list[Item]) -> tuple[bool, s
         item, rec = actual[i], recorded[i]
         if _sha(item.text) != rec["sha256"]:
             problems.append(f"{i}: text hash differs from the manifest")
-        elif (item.family, item.channel, item.label, split_of(item)) != (
+        elif (item.family, item.channel, item.label, split_of(item), item.author) != (
             rec["family"],
             rec["channel"],
             rec["label"],
             rec["split"],
+            rec.get("author", ""),
         ):
-            problems.append(f"{i}: family, channel, label or split differs from the manifest")
+            problems.append(f"{i}: family, channel, label, split or author differs from the manifest")
     heldout = len({r["family"] for r in manifest["items"] if r["family"] in HELD_OUT})
     if heldout != len(HELD_OUT):
         problems.append(f"heldout={heldout}, expected {len(HELD_OUT)}")

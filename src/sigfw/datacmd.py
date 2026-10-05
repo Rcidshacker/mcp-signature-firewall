@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -110,13 +112,28 @@ def _dump(manifest: dict[str, Any]) -> str:
     return json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
 
 
+def shadowing_info(shadowing: Path, kept: list[Item]) -> dict[str, Any]:
+    """Author counts of the shadowing family, the pinned commit and the G-set source hash (when those files exist)."""
+    info: dict[str, Any] = {"authors": dict(sorted(Counter(i.author for i in kept if i.family == "shadowing").items()))}
+    commit_file = shadowing.with_name("shadowing.commit")
+    if commit_file.is_file():
+        commit = commit_file.read_text(encoding="utf-8").strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise LoaderError(f"{commit_file} must hold a full 40-character commit hash")
+        info["commit"] = commit
+    gset = shadowing.parent / "sources" / "gset_v1.json"
+    if gset.is_file():
+        info["gset_v1_sha256"] = hashlib.sha256(gset.read_bytes()).hexdigest()
+    return info
+
+
 def split(raw: Path, shadowing: Path, manifest_path: Path, *, verify: bool) -> int:
     try:
         kept, dropped = _build(raw, shadowing)
+        fresh = build_manifest(kept, dropped, shadowing_info(shadowing, kept))
     except LoaderError as e:
         print(f"ERROR {e}")
         return 1
-    fresh = build_manifest(kept, dropped)
     if not verify:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(_dump(fresh), encoding="utf-8", newline="\n")
