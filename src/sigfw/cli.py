@@ -11,11 +11,12 @@ from pathlib import Path
 
 import httpx
 
-from sigfw import datacmd, evalcmd
+from sigfw import datacmd, draftcmd, evalcmd
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
 from sigfw.probe import DEFAULT_CANDIDATES, Candidate, render_markdown, run_probe
+from sigfw.quoting import SLICES, SOURCE_TYPES
 from sigfw.sources import fetch_all
 
 
@@ -44,6 +45,22 @@ def _build_parser() -> argparse.ArgumentParser:
     cq.add_argument("--dir", type=Path, default=Path("data/own"))
     cq.add_argument("--raw", type=Path, default=Path("data/raw"))
     cq.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
+    dq = data.add_parser(
+        "draft-quoting", help="draft quoting candidates with Nemotron 3 Super (live; needs --confirm-live)"
+    )
+    dq.add_argument("--source-type", choices=SOURCE_TYPES, required=True)
+    dq.add_argument("--n", type=int, required=True)
+    dq.add_argument("--slice", choices=SLICES, default="frozen")
+    dq.add_argument("--confirm-live", action="store_true")
+    dq.add_argument("--prompts", type=Path, default=Path("data/gen_prompts"))
+    dq.add_argument("--staging", type=Path, default=Path("var/drafts/staging.jsonl"))
+    dq.add_argument("--ledger", type=Path, default=Path("var/drafts/ledger.jsonl"))
+    dq.add_argument("--dir", type=Path, default=Path("data/own"))
+    rq = data.add_parser("review-quoting", help="accept or reject staged drafts one at a time (no editing)")
+    rq.add_argument("--staging", type=Path, default=Path("var/drafts/staging.jsonl"))
+    rq.add_argument("--ledger", type=Path, default=Path("var/drafts/ledger.jsonl"))
+    rq.add_argument("--dir", type=Path, default=Path("data/own"))
+    rq.add_argument("--log", type=Path, default=Path("data/own/quoting_review_log.jsonl"))
     add = data.add_parser("add-own", help="append one author=human shadowing row from typed answers")
     add.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
@@ -149,6 +166,21 @@ def main(
         )
     if args.group == "data" and args.cmd == "check-quoting":
         return datacmd.check_quoting(args.slice, args.dir, args.raw, args.shadowing)
+    if args.group == "data" and args.cmd == "draft-quoting":
+        return draftcmd.draft(
+            source_type=args.source_type,
+            n=args.n,
+            slice_name=args.slice,
+            confirm_live=args.confirm_live,
+            prompts_dir=args.prompts,
+            staging=args.staging,
+            ledger_path=args.ledger,
+            own_dir=args.dir,
+            env=environment,
+            transport=transport,
+        )
+    if args.group == "data" and args.cmd == "review-quoting":
+        return draftcmd.review(staging=args.staging, own_dir=args.dir, log_path=args.log, ledger_path=args.ledger)
     if args.group == "data" and args.cmd == "add-own":
         return datacmd.add_own(args.path)
     if args.group == "data" and args.cmd == "fetch":
