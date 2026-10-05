@@ -11,6 +11,7 @@ from pathlib import Path
 
 import httpx
 
+from sigfw import datacmd
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
@@ -30,6 +31,18 @@ def _build_parser() -> argparse.ArgumentParser:
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
     fetch.add_argument("--dest", type=Path, default=Path("data/raw"))
+    for name, text in (
+        ("stats", "per-family counts before and after dedupe (counts only)"),
+        ("split", "build the split manifest, or check it against a fresh rebuild with --verify"),
+        ("leakage-check", "check that no dev item is a near-duplicate of a frozen item"),
+    ):
+        sub = data.add_parser(name, help=text)
+        sub.add_argument("--raw", type=Path, default=Path("data/raw"))
+        sub.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
+        if name != "stats":
+            sub.add_argument("--manifest", type=Path, default=Path("data/manifest/split_v1.json"))
+        if name == "split":
+            sub.add_argument("--verify", action="store_true")
     return p
 
 
@@ -104,5 +117,11 @@ def main(
         return _check_own(args)
     if args.group == "data" and args.cmd == "fetch":
         return _fetch(args)
+    if args.group == "data" and args.cmd == "stats":
+        return datacmd.stats(args.raw, args.shadowing)
+    if args.group == "data" and args.cmd == "split":
+        return datacmd.split(args.raw, args.shadowing, args.manifest, verify=args.verify)
+    if args.group == "data" and args.cmd == "leakage-check":
+        return datacmd.leakage(args.raw, args.shadowing, args.manifest)
     print("sigfw: unknown command", file=sys.stderr)
     return 2

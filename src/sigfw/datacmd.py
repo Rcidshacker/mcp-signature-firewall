@@ -1,0 +1,91 @@
+"""Handlers for `sigfw data stats | split | leakage-check`. They print counts, ids and hashes, never dataset text."""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+from sigfw.dedupe import Dropped, dedupe
+from sigfw.items import HELD_OUT, Item, LoaderError, canonicalize, load_all, load_third_party
+from sigfw.split import build_manifest, find_leaks, verify_manifest
+
+DEV_FLOOR = 30  # design aim: about 10 families with 30 or more examples each after dedupe
+FROZEN_FLOOR = 20  # ADR 0001: held-out families under 20 are exempt from the 70% floor
+
+
+def _build(raw: Path, shadowing: Path) -> tuple[list[Item], list[Dropped]]:
+    return dedupe(canonicalize(load_all(raw, shadowing)))
+
+
+def stats(raw: Path, shadowing: Path) -> int:
+    """Per-family counts before and after dedupe. Works without the shadowing set and says so."""
+    try:
+        items = load_all(raw, shadowing)
+        note = None
+    except LoaderError as e:
+        if "shadowing" not in str(e):
+            print(f"ERROR {e}")
+            return 1
+        items, note = load_third_party(raw), f"shadowing set not usable ({e}); counts below exclude it"
+    kept, dropped = dedupe(canonicalize(items))
+    before, after = Counter(i.family for i in items), Counter(i.family for i in kept)
+    for fam in sorted(before):
+        side = "frozen" if fam in HELD_OUT else "dev"
+        floor = FROZEN_FLOOR if side == "frozen" else DEV_FLOOR
+        flag = f"  WARN under {floor}" if after[fam] < floor else ""
+        print(f"{fam:28s} {side:6s} before={before[fam]:5d} after={after[fam]:5d}{flag}")
+    reasons = Counter(d.reason for d in dropped)
+    print(f"dropped exact={reasons['exact']} near={reasons['near']}")
+    heldout = len({i.family for i in kept if i.family in HELD_OUT})
+    print(f"STATS items={len(kept)} families={len(after)} heldout={heldout}")
+    if note:
+        print(f"NOTE {note}")
+    return 0
+
+
+def _dump(manifest: dict[str, Any]) -> str:
+    return json.dumps(manifest, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
+
+
+def split(raw: Path, shadowing: Path, manifest_path: Path, *, verify: bool) -> int:
+    try:
+        kept, dropped = _build(raw, shadowing)
+    except LoaderError as e:
+        print(f"ERROR {e}")
+        return 1
+    fresh = build_manifest(kept, dropped)
+    if not verify:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(_dump(fresh), encoding="utf-8", newline="\n")
+        print(f"SPLIT_WRITTEN items={len(kept)} manifest={manifest_path}")
+        return 0
+    try:
+        recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"MANIFEST_FAIL {manifest_path} not found: run `sigfw data split` first")
+        return 1
+    ok, line = verify_manifest(recorded, kept)
+    if ok and recorded != fresh:
+        ok, line = False, "MANIFEST_FAIL the manifest differs from a fresh rebuild (dropped list, pins or parameters)"
+    print(line)
+    return 0 if ok else 1
+
+
+def leakage(raw: Path, shadowing: Path, manifest_path: Path) -> int:
+    try:
+        kept, _ = _build(raw, shadowing)
+        recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (LoaderError, FileNotFoundError) as e:
+        print(f"ERROR {e}")
+        return 1
+    ok, line = verify_manifest(recorded, kept)  # the check is only meaningful on the data the manifest describes
+    if not ok:
+        print(line)
+        return 1
+    leaks = find_leaks(kept, {r["id"]: r["split"] for r in recorded["items"]})
+    for dev_id, frozen_id, score in leaks:
+        print(f"LEAK {dev_id} ~ {frozen_id} jaccard={score:.2f}")
+    print(f"LEAK={len(leaks)}")
+    return 0 if not leaks else 1

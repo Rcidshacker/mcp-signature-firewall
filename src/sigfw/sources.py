@@ -36,7 +36,6 @@ _INJECAGENT = ("uiuc-kang-lab/InjecAgent", "f19c9f2c79a41046eb13c03c51a24c567a8f
 
 PINS: tuple[Pin, ...] = (
     Pin("mcptox", *_MCPTOX, "pure_tool.json", "0198262328539de9d0323f3d8dd3706eb0a16aaf", 316620),
-    Pin("mcptox", *_MCPTOX, "response_all.json", "65dbe0a684471eab5717b2938223a6898f75d32d", 20666873),
     Pin("bipia", *_BIPIA, "benchmark/code_attack_test.json", "5c55000d29c51c4349b01e68b262de6855bf0fa8", 16356),
     Pin("bipia", *_BIPIA, "benchmark/code_attack_train.json", "c9bbd9a3a7dfaebe75eac83b26cb7ddf62c1821b", 16343),
     Pin("bipia", *_BIPIA, "benchmark/text_attack_test.json", "259e58a7aaf696ecddbf664022c0f254318b0a05", 6322),
