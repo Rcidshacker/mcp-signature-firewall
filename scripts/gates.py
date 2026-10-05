@@ -49,6 +49,14 @@ def freeze_order() -> bool:
     return ok
 
 
+def quoting_slices() -> bool:
+    from sigfw.datacmd import check_quoting
+
+    own = Path("data/own")
+    results = [check_quoting(s, own, Path("data/raw"), own / "shadowing.jsonl") for s in ("frozen", "dev")]
+    return all(r == 0 for r in results)
+
+
 CHECKS = {
     "tests": (tests_pass, "TESTS_OK"),
     "env-ignored": (env_ignored, "ENV_IGNORED_OK"),
@@ -56,6 +64,7 @@ CHECKS = {
     "no-keys": (no_keys_in_tree, "NO_KEYS_OK"),
     "prompt-order": (prompt_order, "PROMPT_ORDER_OK"),
     "freeze-order": (freeze_order, "FREEZE_ORDER_OK"),
+    "quoting": (quoting_slices, "QUOTING_BOTH_OK"),
 }
 
 

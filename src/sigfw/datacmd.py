@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from sigfw import quoting
 from sigfw.dedupe import Dropped, dedupe
 from sigfw.items import HELD_OUT, Item, LoaderError, canonicalize, load_all, load_third_party
 from sigfw.owndata import CHANNEL, CLAUSE_POSITIONS, FAMILY, MIN_N, check_shadowing
@@ -167,3 +168,29 @@ def leakage(raw: Path, shadowing: Path, manifest_path: Path) -> int:
         print(f"LEAK {dev_id} ~ {frozen_id} jaccard={score:.2f}")
     print(f"LEAK={len(leaks)}")
     return 0 if not leaks else 1
+
+
+def check_quoting(slice_name: str, own_dir: Path, raw: Path, shadowing: Path) -> int:
+    """Validate one quoting slice. The held-out attack text is read only to look for shared 30-character stretches."""
+    path = own_dir / f"quoting_{slice_name}.jsonl"
+    if not path.is_file():
+        print(f"quoting slice={slice_name} n=0")
+        print(f"ERROR file not found: {path}")
+        return 1
+    try:
+        items = load_all(raw, shadowing)  # the overlap check needs every held-out family
+    except LoaderError as e:
+        print(f"ERROR cannot check overlap with held-out attacks: {e}")
+        return 1
+    windows = quoting.attack_windows(quoting.heldout_attacks(items))
+    raws = {s: quoting.read(own_dir / f"quoting_{s}.jsonl") for s in quoting.SLICES}
+    report = quoting.check_slice(slice_name, raws, windows)
+    print(f"quoting slice={slice_name} n={report.n}")
+    for line in report.summary:
+        print(line)
+    for prefix, lines in (("NOTE", report.notes), ("WARN", report.warnings), ("ERROR", report.errors)):
+        for line in lines:
+            print(f"{prefix} {line}")
+    if report.ok:
+        print(f"QUOTING_OK slice={slice_name}")
+    return 0 if report.ok else 1

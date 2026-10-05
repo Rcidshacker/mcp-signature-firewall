@@ -7,17 +7,17 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=88d84dabb53514a5b18a941ee76cf392d12db059ed77f8ace4cbb2eeb2521c76; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=7b887b912c68343ca5be891bbe4fd1d2f07dfd252562502e75beb82908ef5980; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
   EXPECT: All checks passed!
   EVIDENCE: automatic-evidence=v1; definition-sha256=304de969ad2d7b880ac1c92eac805b6231dcb383090814d38560ae64c3676104; exit=0; EXPECT=matched; output-sha256=82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18; output-bytes=19; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
-- [x] G3: types clean
+- [ ] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=ea3299ab53ad62c778e8f16e6c893f593021e856b8a4d697536e1e96a05823c8; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: pending
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"
@@ -57,3 +57,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
   CHECK: uv run python scripts/gates.py freeze-order
   EXPECT: FREEZE_ORDER_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=9c003f91506d7587d894ac46ce185357a1de64137b03f4175604e532b3f2ffa9; exit=0; EXPECT=matched; output-sha256=ea3d44f4ed97fb87dac7c0971e73374b60db68d9a344f9eba8d1f6144cd40ffe; output-bytes=60; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+
+- [ ] G12: check-quoting passes on both slices (frozen: exactly 200 reviewed rows; dev: 40 to 60 rows) [pending: the author writes the slices]
+  CHECK: uv run python scripts/gates.py quoting
+  EXPECT: QUOTING_BOTH_OK

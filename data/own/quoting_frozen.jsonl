@@ -1,0 +1,2 @@
+{"id": "TEMPLATE-1", "author": "human", "slice": "frozen", "source_type": "docs", "form": "discussion", "channel": "other", "reviewed": false, "text": "TEMPLATE ROW: not real quoting text and never counted. Delete it or leave it; write your own rows below."}
+{"id": "TEMPLATE-2", "author": "human", "slice": "frozen", "source_type": "forum_post", "form": "verbatim_quote", "channel": "tool_result", "reviewed": false, "text": "TEMPLATE ROW: second placeholder showing the field layout only."}

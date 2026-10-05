@@ -39,6 +39,11 @@ def _build_parser() -> argparse.ArgumentParser:
     data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
     own = data.add_parser("check-own", help="validate the hand-written shadowing set")
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
+    cq = data.add_parser("check-quoting", help="validate a quoting slice (frozen needs exactly 200 reviewed rows)")
+    cq.add_argument("--slice", choices=("frozen", "dev"), required=True)
+    cq.add_argument("--dir", type=Path, default=Path("data/own"))
+    cq.add_argument("--raw", type=Path, default=Path("data/raw"))
+    cq.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
     add = data.add_parser("add-own", help="append one author=human shadowing row from typed answers")
     add.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
@@ -142,6 +147,8 @@ def main(
             env=environment,
             transport=transport,
         )
+    if args.group == "data" and args.cmd == "check-quoting":
+        return datacmd.check_quoting(args.slice, args.dir, args.raw, args.shadowing)
     if args.group == "data" and args.cmd == "add-own":
         return datacmd.add_own(args.path)
     if args.group == "data" and args.cmd == "fetch":
