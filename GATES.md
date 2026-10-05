@@ -7,17 +7,17 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=7b887b912c68343ca5be891bbe4fd1d2f07dfd252562502e75beb82908ef5980; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=8be296e4c6ac475680d52d09fb266a0302819b6f3592f911f23a299c1084490c; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
   EXPECT: All checks passed!
   EVIDENCE: automatic-evidence=v1; definition-sha256=304de969ad2d7b880ac1c92eac805b6231dcb383090814d38560ae64c3676104; exit=0; EXPECT=matched; output-sha256=82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18; output-bytes=19; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
-- [ ] G3: types clean
+- [x] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: pending
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=706935f02fed95e8e0241ec13fa86be727783ee491ba3e8e4470ceaeed6232d8; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"

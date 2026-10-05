@@ -23,7 +23,7 @@ def filler(seed: int, words: int = 25) -> str:
     return " ".join(rng.choice(WORDS) for _ in range(words))
 
 
-def make_q(i: int, slice_name: str = "frozen", **over: object) -> dict[str, object]:
+def make_q(i: int, slice_name: str = "frozen", /, **over: object) -> dict[str, object]:
     row: dict[str, object] = {
         "id": f"{slice_name[0]}q{i:03d}",
         "author": "human" if i % 3 == 0 else "nemotron-super",
