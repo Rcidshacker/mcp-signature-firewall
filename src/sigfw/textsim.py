@@ -22,13 +22,7 @@ def jaccard(a: frozenset[str], b: frozenset[str]) -> float:
     return len(a & b) / len(a | b)
 
 
-def near_duplicate_pairs(texts: Sequence[str], threshold: float = NEAR_DUP_THRESHOLD) -> list[tuple[int, int, float]]:
-    """Index pairs (i < j) whose n-gram Jaccard is at least the threshold. Exact duplicates score 1.0."""
+def pair_scores(texts: Sequence[str]) -> list[tuple[int, int, float]]:
+    """Jaccard score of every index pair (i < j). Exact duplicates score 1.0."""
     grams = [ngrams(t) for t in texts]
-    pairs: list[tuple[int, int, float]] = []
-    for i in range(len(grams)):
-        for j in range(i + 1, len(grams)):
-            score = jaccard(grams[i], grams[j])
-            if score >= threshold:
-                pairs.append((i, j, score))
-    return pairs
+    return [(i, j, jaccard(grams[i], grams[j])) for i in range(len(grams)) for j in range(i + 1, len(grams))]

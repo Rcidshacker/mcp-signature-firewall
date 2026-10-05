@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from sigfw.owndata import TEMPLATE_PREFIX, check_shadowing
+from sigfw.owndata import TEMPLATE_TECHNIQUE, check_shadowing
 from sigfw.textnorm import normalize
 
 # Held-out families (ADR 0001): never in the dev set or the signature library. "bipia_text" is all 15 BIPIA text
@@ -87,7 +87,7 @@ def load_shadowing(path: Path) -> list[Item]:
     return [
         Item(f"own/shadowing/{r['id']}", "own", "shadowing", "tool_description", "attack", r["text"])
         for r in rows
-        if not r["id"].startswith(TEMPLATE_PREFIX)
+        if r["technique"].strip() != TEMPLATE_TECHNIQUE
     ]
 
 

@@ -14,82 +14,26 @@ import pytest
 from sigfw.cli import main
 from sigfw.textsim import jaccard, ngrams
 
-WORDS = [
-    "amber",
-    "basil",
-    "cedar",
-    "dune",
-    "ember",
-    "fjord",
-    "glade",
-    "harbor",
-    "iris",
-    "juniper",
-    "kelp",
-    "lagoon",
-    "meadow",
-    "nectar",
-    "orchid",
-    "pebble",
-    "quartz",
-    "ripple",
-    "sable",
-    "thistle",
-    "umber",
-    "velvet",
-    "willow",
-    "xenon",
-    "yarrow",
-    "zephyr",
-    "anchor",
-    "bridge",
-    "candle",
-    "drift",
-    "easel",
-    "feather",
-    "garnet",
-    "hollow",
-    "island",
-    "jasper",
-    "kettle",
-    "lantern",
-    "marble",
-    "nutmeg",
-    "oyster",
-    "paddle",
-    "quiver",
-    "rafter",
-    "saddle",
-    "timber",
-    "upland",
-    "vessel",
-    "walnut",
-    "yonder",
-    "zenith",
-    "acorn",
-    "beacon",
-    "cobble",
-    "dapple",
-    "fennel",
-    "gravel",
-    "hickory",
-    "indigo",
-    "jostle",
-]
-PLACEMENTS = ("start", "middle", "end")
-LENGTHS = ("short", "medium", "long")
+WORDS = [a + b for a in "bcdfghjklmnprstvwz" for b in ("ar", "el", "ix", "on", "um", "ope")]
+CLAUSE_POSITIONS = ("start", "middle", "end")
+
+
+def filler(seed: int, words: int = 25) -> str:
+    rng = random.Random(seed)
+    return " ".join(rng.choice(WORDS) for _ in range(words))
 
 
 def make_row(i: int, **over: object) -> dict[str, object]:
-    rng = random.Random(i)
     row: dict[str, object] = {
         "id": f"s{i:03d}",
+        "author": "gpt" if i % 5 else "human",
         "channel": "tool_description",
         "family": "shadowing",
-        "text": " ".join(rng.choice(WORDS) for _ in range(25)),
         "technique": f"tech{i % 7}",
-        "placement": PLACEMENTS[i % 3],
-        "length_bucket": LENGTHS[i % 3],
+        "clause_position": CLAUSE_POSITIONS[i % 3],
+        "host_tool": f"host.tool{i}",
+        "target_tool": f"target.tool{i}",
+        "text": filler(i),
     }
     row.update(over)
     return row
@@ -103,6 +47,12 @@ def write(path: Path, rows: list[dict[str, object]]) -> Path:
 def run(path: Path, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
     code = main(["data", "check-own", "--path", str(path)], env={})
     return code, capsys.readouterr().out
+
+
+def line(out: str, prefix: str) -> str:
+    matches = [ln for ln in out.splitlines() if ln.startswith(prefix)]
+    assert len(matches) == 1, f"expected one {prefix!r} line in:\n{out}"
+    return matches[0]
 
 
 def test_jaccard_hand_computed() -> None:
@@ -125,6 +75,13 @@ def test_fewer_than_thirty_five_fails(tmp_path: Path, capsys: pytest.CaptureFixt
     assert "35" in out
 
 
+def test_both_authors_count_toward_the_total(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [make_row(i, author="gpt") for i in range(35)] + [make_row(i, author="human") for i in range(40, 52)]
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 0 and out.splitlines()[0] == "shadowing n=47"
+    assert line(out, "author:") == "author: human=12 gpt=35"
+
+
 def test_exact_duplicate_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rows = [make_row(i) for i in range(35)]
     rows.append(make_row(99, text=str(rows[3]["text"]).upper()))  # same text, different case
@@ -135,23 +92,34 @@ def test_exact_duplicate_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
 def test_near_duplicate_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rows = [make_row(i) for i in range(35)]
-    rows.append(make_row(98, text=str(rows[5]["text"]) + " extra"))  # one added word on a ~150 char text
+    rows.append(make_row(98, text=str(rows[5]["text"]) + " extra"))  # one added word on a ~100 char text
     code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
     assert code == 1
     assert "s005" in out and "s098" in out and "near-duplicate" in out.lower()
 
 
+def test_near_duplicates_are_found_across_authors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [make_row(i, author="gpt") for i in range(35)]
+    rows.append(make_row(98, author="human", text=str(rows[5]["text"]) + " extra"))
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 1 and "s005" in out and "s098" in out
+
+
 def test_template_rows_are_never_counted(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rows = [make_row(i) for i in range(35)]
-    rows += [make_row(500, id="TEMPLATE-1", text="TEMPLATE"), make_row(501, id="TEMPLATE-2", text="TEMPLATE")]
+    rows += [
+        make_row(500, id="TEMPLATE-1", technique="TEMPLATE", text="TEMPLATE"),
+        make_row(501, id="TEMPLATE-2", technique="TEMPLATE", text="TEMPLATE"),
+    ]
     code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
     assert code == 0  # two identical placeholder texts are not a duplicate pair
     assert out.splitlines()[0] == "shadowing n=35"
     assert "TEMPLATE" in out  # ignored rows are mentioned
+    assert "TEMPLATE" not in line(out, "technique:")
 
 
 def test_template_only_file_has_n_zero_and_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    rows = [make_row(500, id="TEMPLATE-1", text="TEMPLATE")]
+    rows = [make_row(500, id="TEMPLATE-1", technique="TEMPLATE", text="TEMPLATE")]
     code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
     assert code == 1
     assert out.splitlines()[0] == "shadowing n=0"
@@ -160,12 +128,14 @@ def test_template_only_file_has_n_zero_and_fails(tmp_path: Path, capsys: pytest.
 @pytest.mark.parametrize(
     ("over", "needle"),
     [
-        ({"placement": "top"}, "placement"),
-        ({"length_bucket": "tiny"}, "length_bucket"),
+        ({"clause_position": "top"}, "clause_position"),
+        ({"author": "claude"}, "author"),
         ({"channel": "tool_result"}, "channel"),
         ({"family": "other"}, "family"),
         ({"text": "   "}, "text"),
         ({"technique": ""}, "technique"),
+        ({"host_tool": ""}, "host_tool"),
+        ({"target_tool": "  "}, "target_tool"),
         ({"id": ""}, "id"),
         ({"text": 5}, "text"),
     ],
@@ -179,6 +149,16 @@ def test_bad_field_values_fail_with_the_field_name(
     assert code == 1
     assert "line 8" in out and needle in out
     assert out.splitlines()[0] == "shadowing n=34"  # the bad row is not counted
+
+
+@pytest.mark.parametrize("stored", ["length_bucket", "word_count", "length", "placement"])
+def test_computed_or_retired_fields_must_not_be_stored(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], stored: str
+) -> None:
+    rows = [make_row(i) for i in range(35)]
+    rows[2][stored] = "short"
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 1 and "line 3" in out and stored in out
 
 
 def test_missing_and_unknown_fields_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -216,25 +196,81 @@ def test_missing_file_fails_cleanly(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert out.splitlines()[0] == "shadowing n=0" and "not found" in out.lower()
 
 
-def test_thin_spread_warns_but_does_not_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    rows = [make_row(i, technique="one", placement="start", length_bucket="short") for i in range(35)]
+# ---------------------------------------------------------------- length buckets and the printed summary
+
+
+@pytest.mark.parametrize(
+    ("words", "bucket"), [(1, "short"), (25, "short"), (26, "medium"), (45, "medium"), (46, "long"), (120, "long")]
+)
+def test_length_bucket_is_computed_from_the_word_count(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], words: int, bucket: str
+) -> None:
+    rows = [make_row(i) for i in range(1, 35)] + [make_row(0, text=filler(900 + words, words))]
+    _, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert f"{bucket}=" in line(out, "length_bucket:")
+    # the 34 other rows are 25 words (short); the probe row lands in `bucket`
+    expected = {"short": 35 if bucket == "short" else 34, "medium": 0, "long": 0}
+    if bucket != "short":
+        expected[bucket] = 1
+    assert line(out, "length_bucket:") == "length_bucket: " + " ".join(f"{k}={v}" for k, v in expected.items())
+
+
+def test_summary_counts_by_author_technique_position_and_crosstab(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = [make_row(i) for i in range(35)]
+    _, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert line(out, "author:") == "author: human=7 gpt=28"
+    assert line(out, "technique:") == "technique: tech0=5 tech1=5 tech2=5 tech3=5 tech4=5 tech5=5 tech6=5"
+    assert line(out, "clause_position:") == "clause_position: start=12 middle=12 end=11"
+    assert out.count("length_bucket x clause_position:") == 1
+    assert "  short: start=12 middle=12 end=11" in out  # all fixture rows are 25 words, so all are short
+    assert "  medium: start=0 middle=0 end=0" in out
+
+
+def test_closest_pairs_and_max_jaccard_are_printed_by_id_only(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = [make_row(i) for i in range(35)]
+    # a pair that is similar but under the 0.85 threshold: share a long prefix, differ in the tail
+    rows[10]["text"] = filler(10, 12) + " " + filler(77, 13)
+    rows[11]["text"] = filler(10, 12) + " " + filler(78, 13)
     code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
     assert code == 0
-    warns = [ln for ln in out.splitlines() if ln.startswith("WARN")]
-    text = "\n".join(warns)
-    assert "technique" in text and "placement" in text and "length_bucket" in text
+    closest = [ln for ln in out.splitlines() if ln.startswith("closest:")]
+    assert len(closest) == 1
+    pairs = closest[0].removeprefix("closest: ").split("; ")
+    assert len(pairs) == 5
+    assert pairs[0].startswith("s010 s011 ")  # the engineered pair is the closest
+    scores = [float(p.rsplit(" ", 1)[1]) for p in pairs]
+    assert scores == sorted(scores, reverse=True)
+    assert line(out, "max_jaccard=") == f"max_jaccard={scores[0]:.2f}"
+    for row in rows:  # only ids and scores, never text
+        assert str(row["text"]) not in out
 
 
-def test_balanced_spread_has_no_warnings(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _, out = run(write(tmp_path / "s.jsonl", [make_row(i) for i in range(35)]), capsys)
-    assert not [ln for ln in out.splitlines() if ln.startswith("WARN")]
+def test_thin_technique_spread_warns_but_does_not_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [make_row(i, technique="one") for i in range(35)]
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 0
+    assert any(ln.startswith("WARN") and "technique" in ln for ln in out.splitlines())
+
+
+def test_unbalanced_positions_and_lengths_do_not_warn(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # clause_position is an annotation reported as annotated: no balance claim, so no balance warning
+    rows = [make_row(i, clause_position="start") for i in range(35)]
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 0 and not [ln for ln in out.splitlines() if ln.startswith("WARN")]
 
 
 def test_committed_template_is_valid_but_never_counts(capsys: pytest.CaptureFixture[str]) -> None:
     template = Path(__file__).resolve().parents[1] / "data" / "own" / "shadowing.template.jsonl"
     rows = [json.loads(ln) for ln in template.read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(rows) == 2
-    assert all(str(r["id"]).startswith("TEMPLATE") and str(r["text"]).startswith("TEMPLATE") for r in rows)
+    assert all(
+        r["technique"] == "TEMPLATE" and str(r["id"]).startswith("TEMPLATE") and str(r["text"]).startswith("TEMPLATE")
+        for r in rows
+    )
     code, out = run(template, capsys)
     assert code == 1
     assert out.splitlines()[0] == "shadowing n=0"

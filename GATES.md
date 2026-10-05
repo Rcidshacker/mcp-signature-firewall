@@ -7,7 +7,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=34c6f4d59752935e401066384450ce124eb34a59d029d9118f905748607ccc54; output-bytes=31; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=5997fa47248ca8c3bffd9705b510a1975dec47ca0db407e5312cc9d7a56512f2; output-bytes=32; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
@@ -17,7 +17,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=2ea17864b2fae3692d354a40d996a3e5e904fbb9b766aa2ba1f83ab52a36747d; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=dda4c9b5d4afe91534d9c20ef74d9c9ce814b17a96dcddd45fc05d5dfadf304b; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"

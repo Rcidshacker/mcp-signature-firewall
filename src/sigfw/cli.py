@@ -70,6 +70,8 @@ def _check_own(args: argparse.Namespace) -> int:
         return 1
     report = check_shadowing(raw)
     print(f"shadowing n={report.n}")
+    for line in report.summary:
+        print(line)
     for prefix, lines in (("NOTE", report.notes), ("WARN", report.warnings), ("ERROR", report.errors)):
         for line in lines:
             print(f"{prefix} {line}")
