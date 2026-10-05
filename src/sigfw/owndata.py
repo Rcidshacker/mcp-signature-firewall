@@ -8,6 +8,7 @@ duplicate pair. word_count and length_bucket are computed from the text and must
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -18,12 +19,17 @@ FAMILY = "shadowing"
 FIELDS = frozenset(
     {"id", "author", "channel", "family", "technique", "clause_position", "host_tool", "target_tool", "text"}
 )
+OPTIONAL_FIELDS = frozenset({"source_placement"})
 AUTHORS = ("human", "gpt")
-CLAUSE_POSITIONS = ("start", "middle", "end")
+CLAUSE_POSITIONS = ("start", "middle", "end", "only")  # literal position of the clause in the text
+SOURCE_PLACEMENTS = ("start", "middle", "end")  # optional, unreliable annotation from the source (Amendment 6)
 LENGTH_BUCKETS = ("short", "medium", "long")
 SHORT_MAX_WORDS = 25  # short <= 25 words, medium 26-45, long >= 46
 MEDIUM_MAX_WORDS = 45
 TEMPLATE_TECHNIQUE = "TEMPLATE"
+_SNAKE_CASE = re.compile(
+    r"[a-z][a-z0-9]*(_[a-z0-9]+)*"
+)  # technique labels; mapping table: data/own/technique_labels.json
 MIN_N = 35  # Amendment 2: at least 35 rows so that 30 or more survive dedupe
 MIN_TECHNIQUES = 5  # technique-spread warnings, never failures
 MAX_TECHNIQUE_SHARE = 0.30
@@ -54,19 +60,26 @@ def _validate(row: object) -> tuple[dict[str, str] | None, list[str]]:
     if not isinstance(row, dict):
         return None, ["row is not a JSON object"]
     problems = [f"missing field {k!r}" for k in sorted(FIELDS - row.keys())]
-    problems += [f"unknown field {k!r}" for k in sorted(row.keys() - FIELDS)]
-    problems += [f"{k} must be a string" for k in sorted(FIELDS & row.keys()) if not isinstance(row[k], str)]
+    problems += [f"unknown field {k!r}" for k in sorted(row.keys() - FIELDS - OPTIONAL_FIELDS)]
+    problems += [
+        f"{k} must be a string" for k in sorted((FIELDS | OPTIONAL_FIELDS) & row.keys()) if not isinstance(row[k], str)
+    ]
     if problems:
         return None, problems
     for name in ("id", "text", "technique", "host_tool", "target_tool"):
         if not row[name].strip():
             problems.append(f"{name} must not be empty")
+    technique = row["technique"].strip()
+    if technique and technique != TEMPLATE_TECHNIQUE and not _SNAKE_CASE.fullmatch(technique):
+        problems.append("technique must be lowercase snake_case (see data/own/technique_labels.json)")
     if row["author"] not in AUTHORS:
         problems.append(f"author must be one of {'|'.join(AUTHORS)}")
     if row["channel"] != CHANNEL:
         problems.append(f"channel must be {CHANNEL!r}")
     if row["family"] != FAMILY:
         problems.append(f"family must be {FAMILY!r}")
+    if "source_placement" in row and row["source_placement"] not in SOURCE_PLACEMENTS:
+        problems.append(f"source_placement must be one of {'|'.join(SOURCE_PLACEMENTS)}")
     if row["clause_position"] not in CLAUSE_POSITIONS:
         problems.append(f"clause_position must be one of {'|'.join(CLAUSE_POSITIONS)}")
     return (None, problems) if problems else (row, [])

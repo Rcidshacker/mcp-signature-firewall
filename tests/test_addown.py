@@ -32,7 +32,7 @@ def test_appends_one_human_row_with_a_multiline_text(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = write(tmp_path / "s.jsonl", [make_row(i, author="gpt") for i in range(35)])
-    prompts = feed(monkeypatch, ["h-01", "my technique", "end", "host.a", "target.b", "first line", "second line", "."])
+    prompts = feed(monkeypatch, ["h-01", "my_technique", "end", "host.a", "target.b", "first line", "second line", "."])
     assert add(path) == 0
     rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines()]
     assert len(rows) == 36
@@ -41,7 +41,7 @@ def test_appends_one_human_row_with_a_multiline_text(
         "author": "human",
         "channel": "tool_description",
         "family": "shadowing",
-        "technique": "my technique",
+        "technique": "my_technique",
         "clause_position": "end",
         "host_tool": "host.a",
         "target_tool": "target.b",

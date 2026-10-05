@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from pathlib import Path
 
 import pytest
@@ -161,6 +162,37 @@ def test_computed_or_retired_fields_must_not_be_stored(
     assert code == 1 and "line 3" in out and stored in out
 
 
+@pytest.mark.parametrize(
+    "label", ["Argument Redirection", "has space", "camelCase", "trailing_", "_leading", "a__b", "x-y"]
+)
+def test_technique_must_be_lowercase_snake_case(tmp_path: Path, capsys: pytest.CaptureFixture[str], label: str) -> None:
+    rows = [make_row(i) for i in range(35)]
+    rows[4] = make_row(4, technique=label)
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 1 and "line 5" in out and "snake_case" in out
+
+
+def test_snake_case_technique_labels_are_accepted(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [
+        make_row(i, technique=["conditional_trigger", "compat_claim", "embedded_marker", "a1", "b_2"][i % 5])
+        for i in range(35)
+    ]
+    code, _ = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 0
+
+
+def test_committed_labels_follow_the_mapping_table() -> None:
+    root = Path(__file__).resolve().parents[1] / "data" / "own"
+    table = json.loads((root / "technique_labels.json").read_text(encoding="utf-8"))
+    canonical = set(table.values())
+    assert all(re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", c) for c in canonical)
+    assert all(table[c] == c for c in canonical)  # every canonical label maps to itself
+    shadowing = root / "shadowing.jsonl"
+    if shadowing.exists():
+        used = {json.loads(ln)["technique"] for ln in shadowing.read_text(encoding="utf-8").splitlines() if ln.strip()}
+        assert used <= canonical, sorted(used - canonical)
+
+
 def test_missing_and_unknown_fields_fail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rows = [make_row(i) for i in range(35)]
     del rows[1]["technique"]
@@ -222,10 +254,10 @@ def test_summary_counts_by_author_technique_position_and_crosstab(
     _, out = run(write(tmp_path / "s.jsonl", rows), capsys)
     assert line(out, "author:") == "author: human=7 gpt=28"
     assert line(out, "technique:") == "technique: tech0=5 tech1=5 tech2=5 tech3=5 tech4=5 tech5=5 tech6=5"
-    assert line(out, "clause_position:") == "clause_position: start=12 middle=12 end=11"
+    assert line(out, "clause_position:") == "clause_position: start=12 middle=12 end=11 only=0"
     assert out.count("length_bucket x clause_position:") == 1
-    assert "  short: start=12 middle=12 end=11" in out  # all fixture rows are 25 words, so all are short
-    assert "  medium: start=0 middle=0 end=0" in out
+    assert "  short: start=12 middle=12 end=11 only=0" in out  # all fixture rows are 25 words, so all are short
+    assert "  medium: start=0 middle=0 end=0 only=0" in out
 
 
 def test_closest_pairs_and_max_jaccard_are_printed_by_id_only(
@@ -275,3 +307,33 @@ def test_committed_template_is_valid_but_never_counts(capsys: pytest.CaptureFixt
     assert code == 1
     assert out.splitlines()[0] == "shadowing n=0"
     assert "ERROR line" not in out  # the placeholders are schema-valid, only the count fails
+
+
+def test_only_is_a_valid_literal_clause_position(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [make_row(i, clause_position="only") for i in range(35)]
+    code, out = run(write(tmp_path / "s.jsonl", rows), capsys)
+    assert code == 0 and "clause_position: start=0 middle=0 end=0 only=35" in out
+
+
+def test_source_placement_is_optional_and_checked(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [make_row(i, source_placement=["start", "middle", "end"][i % 3]) for i in range(34)] + [make_row(34)]
+    code, _ = run(write(tmp_path / "ok.jsonl", rows), capsys)
+    assert code == 0  # present on some rows, absent on others
+    for bad in ("only", "top", 5):
+        rows[3] = make_row(3, source_placement=bad)
+        code, out = run(write(tmp_path / "bad.jsonl", rows), capsys)
+        assert code == 1 and "line 4" in out and "source_placement" in out
+
+
+def test_committed_rows_follow_the_clause_position_decisions() -> None:
+    path = Path(__file__).resolve().parents[1] / "data" / "own" / "shadowing.jsonl"
+    if not path.exists():
+        return
+    rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    for r in rows:
+        if r["author"] == "gpt":
+            assert r["clause_position"] == "end", r["id"]  # texts are composed description-then-clause
+        else:
+            assert r["clause_position"] == ("end" if r["id"] == "H15" else "only"), r["id"]
+        if "source_placement" in r:
+            assert r["source_placement"] in ("start", "middle", "end")

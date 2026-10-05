@@ -21,7 +21,8 @@ One JSON object per line, UTF-8, LF. Fields:
 | `channel` | exactly `tool_description` |
 | `family` | exactly `shadowing` |
 | `technique` | short label for the technique (free text; `TEMPLATE` rows are ignored) |
-| `clause_position` | where the instruction clause sits in the description: `start`, `middle` or `end`. A human annotation, reported as annotated, with no balance claim |
+| `clause_position` | literal position of the clause in `text`: `start`, `middle`, `end`, or `only` for clause-only text (gpt rows are composed description-then-clause, so `end`) |
+| `source_placement` | optional: the original start, middle or end annotation from the source. Unreliable; carries no balance claim |
 | `host_tool` | the tool whose description carries the clause |
 | `target_tool` | the other tool whose behaviour the clause tries to change |
 | `text` | the tool description, exactly as it would be published |
