@@ -49,3 +49,36 @@ def check_prompt_order(repo: Path) -> tuple[bool, str]:
     if not report.ok:
         return False, f"{SHADOWING_FILE} fails check-own at the pinned commit: n={report.n}; {report.errors[0]}"
     return True, f"shadowing commit {pinned[:12]} (n={report.n}) precedes the first prompt commit {first_prompt[:12]}"
+
+
+FREEZE_PIN_FILE = "data/own/quoting_frozen.commit"
+QUOTING_FILE = "data/own/quoting_frozen.jsonl"
+PROTOCOL_FILE = "protocol.toml"
+
+
+def check_freeze_order(repo: Path) -> tuple[bool, str]:
+    """Gate G11 (ADR 0001, Amendment 7.5): the frozen quoting slice commit is a strict ancestor of the protocol-freeze
+    commit, i.e. the first commit that adds protocol.toml (HEAD while it is still uncommitted)."""
+    history = _git(repo, "log", "--reverse", "--format=%H", "--", PROTOCOL_FILE).stdout.split()
+    present = _git(repo, "ls-files", "--cached", "--others", "--exclude-standard", "--", PROTOCOL_FILE).stdout.split()
+    if not history and not present:
+        return True, "no protocol freeze yet, nothing to order"
+
+    pin_path = repo / FREEZE_PIN_FILE
+    if not pin_path.is_file():
+        return False, f"{PROTOCOL_FILE} exists but {FREEZE_PIN_FILE} is missing"
+    pinned = pin_path.read_text(encoding="utf-8").strip()
+    resolved = _git(repo, "rev-parse", "--verify", "--quiet", f"{pinned}^{{commit}}")
+    if resolved.returncode != 0:
+        return False, f"{FREEZE_PIN_FILE} names {pinned!r}, which is not a commit"
+    pinned = resolved.stdout.strip()
+
+    freeze = history[0] if history else _git(repo, "rev-parse", "HEAD").stdout.strip()
+    if pinned == freeze or _git(repo, "merge-base", "--is-ancestor", pinned, freeze).returncode != 0:
+        return (
+            False,
+            f"quoting commit {pinned[:12]} is not a strict ancestor of the protocol-freeze commit {freeze[:12]}",
+        )
+    if _git(repo, "cat-file", "-e", f"{pinned}:{QUOTING_FILE}").returncode != 0:
+        return False, f"{QUOTING_FILE} does not exist at the pinned commit"
+    return True, f"quoting commit {pinned[:12]} precedes the protocol-freeze commit {freeze[:12]}"

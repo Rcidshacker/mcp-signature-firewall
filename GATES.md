@@ -7,7 +7,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=a8cfd2c4bd6f6fb0d18f3e76529b71d5e70c403727da2c29a08ad81d99df7e65; output-bytes=32; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=88d84dabb53514a5b18a941ee76cf392d12db059ed77f8ace4cbb2eeb2521c76; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
@@ -17,7 +17,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=3a5d3d1ae9e7079eafd3a470abe58d4f48e2f2945c2ba4ec5e79754058f72b20; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=ea3299ab53ad62c778e8f16e6c893f593021e856b8a4d697536e1e96a05823c8; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"
@@ -42,13 +42,18 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G8: no prompt file precedes the pinned shadowing commit (strict ancestor, and the set passes check-own at that commit)
   CHECK: uv run python scripts/gates.py prompt-order
   EXPECT: PROMPT_ORDER_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=e1db8aaf8597f8f801b358b592a5beb100e73fbe92536215b2fff6b78c6479d6; exit=0; EXPECT=matched; output-sha256=acdc2f85a162fa2a3a081cb0ad25f9d6a3b137a708e91f05daa3773e42b52c7a; output-bytes=51; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=e1db8aaf8597f8f801b358b592a5beb100e73fbe92536215b2fff6b78c6479d6; exit=0; EXPECT=matched; output-sha256=df1ba5714d9c556fda6f6be929c92173f9b037bb9d5685f4f049d9c62043d7f2; output-bytes=102; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G9: the author-written shadowing set is complete (n is 35 or more across both authors, no duplicates or near-duplicates)
   CHECK: uv run sigfw data check-own
   EXPECT: /shadowing n=(3[5-9]|[4-9][0-9])/
   EVIDENCE: automatic-evidence=v1; definition-sha256=96f974f608675a4bab8dac9688e1ff0339735250c794e586faf3a641012cf30d; exit=0; EXPECT=matched; output-sha256=4dd569616150e53000a39be0a8a1d9699978164f196f44bf987ca8b29d9c12d6; output-bytes=580; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
-- [ ] G10: the protocol check enforces the ordering and passes [pending M4: `sigfw eval protocol --check` fails unless G8 holds]
+- [ ] G10: the protocol check enforces the ordering and passes [pending M4: `sigfw eval protocol --check` fails unless G8 and G11 hold]
   CHECK: uv run sigfw eval protocol --check
   EXPECT: PROTOCOL_OK
+
+- [x] G11: the frozen quoting slice commit is a strict ancestor of the protocol-freeze commit (vacuous until protocol.toml exists)
+  CHECK: uv run python scripts/gates.py freeze-order
+  EXPECT: FREEZE_ORDER_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9c003f91506d7587d894ac46ce185357a1de64137b03f4175604e532b3f2ffa9; exit=0; EXPECT=matched; output-sha256=ea3d44f4ed97fb87dac7c0971e73374b60db68d9a344f9eba8d1f6144cd40ffe; output-bytes=60; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries

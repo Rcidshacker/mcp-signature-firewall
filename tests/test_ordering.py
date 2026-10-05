@@ -12,7 +12,7 @@ from pathlib import Path
 
 from test_owndata import make_row
 
-from sigfw.ordering import PIN_FILE, check_prompt_order
+from sigfw.ordering import FREEZE_PIN_FILE, PIN_FILE, QUOTING_FILE, check_freeze_order, check_prompt_order
 
 
 def git(repo: Path, *args: str) -> str:
@@ -120,3 +120,70 @@ def test_uncommitted_prompt_file_is_checked_against_head(tmp_path: Path) -> None
     git(repo, "rm", "-q", PIN_FILE)
     git(repo, "commit", "-q", "-m", "unpin")
     assert not check_prompt_order(repo)[0]
+
+
+# ---------------------------------------------------------------- G11: frozen quoting slice before the protocol freeze
+
+
+def pin_quoting(repo: Path, sha: str) -> None:
+    commit_file(repo, FREEZE_PIN_FILE, sha + "\n", "pin quoting commit")
+
+
+def test_freeze_no_protocol_anywhere_is_ok(tmp_path: Path) -> None:
+    ok, msg = check_freeze_order(new_repo(tmp_path))
+    assert ok and "no protocol freeze" in msg
+
+
+def test_freeze_protocol_after_the_pinned_quoting_commit_is_ok(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    sha = commit_file(repo, QUOTING_FILE, '{"id": "q1"}\n', "frozen quoting slice")
+    pin_quoting(repo, sha)
+    commit_file(repo, "protocol.toml", "[classifier]\n", "freeze")
+    assert check_freeze_order(repo)[0]
+
+
+def test_freeze_protocol_before_the_quoting_commit_fails(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    commit_file(repo, "protocol.toml", "[classifier]\n", "freeze first")
+    sha = commit_file(repo, QUOTING_FILE, '{"id": "q1"}\n', "frozen quoting slice")
+    pin_quoting(repo, sha)
+    ok, msg = check_freeze_order(repo)
+    assert not ok and "ancestor" in msg
+
+
+def test_freeze_in_the_same_commit_as_the_quoting_slice_fails(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    (repo / "data" / "own").mkdir(parents=True)
+    (repo / QUOTING_FILE).write_text('{"id": "q1"}\n', encoding="utf-8")
+    (repo / "protocol.toml").write_text("[classifier]\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "both")
+    pin_quoting(repo, git(repo, "rev-parse", "HEAD"))
+    assert not check_freeze_order(repo)[0]
+
+
+def test_freeze_without_a_pin_or_with_an_unknown_pin_fails(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    commit_file(repo, "protocol.toml", "[classifier]\n", "freeze")
+    ok, msg = check_freeze_order(repo)
+    assert not ok and FREEZE_PIN_FILE in msg
+    pin_quoting(repo, "0" * 40)
+    ok, msg = check_freeze_order(repo)
+    assert not ok and "not a commit" in msg
+
+
+def test_freeze_pinned_commit_without_the_quoting_file_fails(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    sha = commit_file(repo, "README.md", "changed\n", "not the quoting slice")
+    pin_quoting(repo, sha)
+    commit_file(repo, "protocol.toml", "[classifier]\n", "freeze")
+    ok, msg = check_freeze_order(repo)
+    assert not ok and "does not exist" in msg
+
+
+def test_freeze_uncommitted_protocol_is_checked_against_head(tmp_path: Path) -> None:
+    repo = new_repo(tmp_path)
+    sha = commit_file(repo, QUOTING_FILE, '{"id": "q1"}\n', "frozen quoting slice")
+    pin_quoting(repo, sha)
+    (repo / "protocol.toml").write_text("[classifier]\n", encoding="utf-8")
+    assert check_freeze_order(repo)[0]

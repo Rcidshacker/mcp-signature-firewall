@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from sigfw import datacmd
+from sigfw import datacmd, evalcmd
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
@@ -26,6 +26,16 @@ def _build_parser() -> argparse.ArgumentParser:
     probe = llm.add_parser("probe-models", help="one tiny call per candidate model; writes a markdown report")
     probe.add_argument("--out", type=Path, default=None, help="default: docs/api-probe-<date>.md")
     probe.add_argument("--date", default=None, help="YYYY-MM-DD (default: today, UTC)")
+    ev = top.add_parser("eval", help="evaluation tools").add_subparsers(dest="cmd", required=True)
+    dp = ev.add_parser("dev-probe", help="classify a few dev items twice and report mix, determinism, errors, latency")
+    dp.add_argument("--prompt", type=Path, required=True)
+    dp.add_argument("--n", type=int, default=24)
+    dp.add_argument("--runs", type=int, default=2)
+    dp.add_argument("--seed", type=int, default=20261005)
+    dp.add_argument("--out", type=Path, default=None, help="default: docs/dev-probe-<date>.md")
+    dp.add_argument("--date", default=None)
+    dp.add_argument("--raw", type=Path, default=Path("data/raw"))
+    dp.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
     data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
     own = data.add_parser("check-own", help="validate the hand-written shadowing set")
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
@@ -119,6 +129,19 @@ def main(
         return _probe_models(args, environment, transport)
     if args.group == "data" and args.cmd == "check-own":
         return _check_own(args)
+    if args.group == "eval" and args.cmd == "dev-probe":
+        return evalcmd.dev_probe(
+            raw=args.raw,
+            shadowing=args.shadowing,
+            prompt_path=args.prompt,
+            n=args.n,
+            runs=args.runs,
+            seed=args.seed,
+            out=args.out,
+            date=args.date,
+            env=environment,
+            transport=transport,
+        )
     if args.group == "data" and args.cmd == "add-own":
         return datacmd.add_own(args.path)
     if args.group == "data" and args.cmd == "fetch":

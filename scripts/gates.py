@@ -41,12 +41,21 @@ def prompt_order() -> bool:
     return ok
 
 
+def freeze_order() -> bool:
+    from sigfw.ordering import check_freeze_order
+
+    ok, message = check_freeze_order(Path.cwd())
+    print(message, file=sys.stderr)
+    return ok
+
+
 CHECKS = {
     "tests": (tests_pass, "TESTS_OK"),
     "env-ignored": (env_ignored, "ENV_IGNORED_OK"),
     "env-example-tracked": (env_example_not_ignored, "ENV_EXAMPLE_OK"),
     "no-keys": (no_keys_in_tree, "NO_KEYS_OK"),
     "prompt-order": (prompt_order, "PROMPT_ORDER_OK"),
+    "freeze-order": (freeze_order, "FREEZE_ORDER_OK"),
 }
 
 
