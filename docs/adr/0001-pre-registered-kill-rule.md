@@ -115,3 +115,14 @@ This amends Amendment 5; nothing is edited in place.
 4. **Dev probe.** 20 to 30 dev items, two runs each at temperature 0 with the Amendment 4 settings. It is non-gating and nothing is tuned from it. Dev items are attacks only until a dev quoting slice exists, so the probe says nothing about false positives.
 5. **Freeze ordering (gate G11).** The commit that fixes the frozen quoting slice must be a strict ancestor of the protocol-freeze commit (the first commit that adds `protocol.toml`), and `sigfw eval protocol --check` fails otherwise.
 6. **Unchanged.** The thresholds, the 2026-10-09 kill date and the exact-200 quoting gate.
+
+## Amendment 8 (2026-10-05, before any quoting item exists and before any model call on a quoting item)
+
+1. **Definition and sizes.** The quoting slice is exactly the glossary definition (hard negatives written to quote or discuss attacks). The frozen slice is exactly 200 items and the dev slice about 50 (40 to 60 accepted), in separate files (`data/own/quoting_frozen.jsonl`, `data/own/quoting_dev.jsonl`) with no overlap between them.
+2. **Authorship.** At least 67 of the frozen 200 are `author=human`; the rest are `author=nemotron-super`. Both authors are reported as non-gating rows; the false-positive gate uses all 200.
+3. **Review.** Every frozen item has `reviewed=true` before the frozen commit. A rejected draft is dropped, and the counts of generated and accepted drafts are recorded. Rejection reasons are limited to: not benign, does not quote or discuss an attack, duplicate, malformed. "The classifier flagged it" is never a reason.
+4. **No classifier in selection.** Classifier verdicts are never used to select or reject quoting items, and the Lightning classifier does not run on any quoting item before the frozen-slice commit.
+5. **No overlap with attack text.** No quoting item may share a 30-character stretch with any held-out attack text or any shadowing row; `sigfw data check-quoting` checks this and reports ids only.
+6. **Ordering.** The frozen quoting commit is pushed before any prompt iteration and before the protocol freeze (gate G11). Gate G12 requires `check-quoting` to pass on both slices.
+7. **NotInject.** The 100-item NotInject slice is optional and non-gating. It is the first thing cut if time is short; if it is cut, that is recorded here before the frozen run.
+8. **Unchanged.** The thresholds, the 2026-10-09 kill date and the exact-200 gate.
