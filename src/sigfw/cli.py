@@ -15,6 +15,7 @@ from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
 from sigfw.probe import DEFAULT_CANDIDATES, Candidate, render_markdown, run_probe
+from sigfw.sources import fetch_all
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -27,7 +28,19 @@ def _build_parser() -> argparse.ArgumentParser:
     data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
     own = data.add_parser("check-own", help="validate the hand-written shadowing set")
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
+    fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
+    fetch.add_argument("--dest", type=Path, default=Path("data/raw"))
     return p
+
+
+def _fetch(args: argparse.Namespace) -> int:
+    errors = fetch_all(args.dest)
+    for e in errors:
+        print(f"ERROR {e}")
+    if errors:
+        return 1
+    print(f"FETCH_OK dest={args.dest}")
+    return 0
 
 
 def _check_own(args: argparse.Namespace) -> int:
@@ -89,5 +102,7 @@ def main(
         return _probe_models(args, environment, transport)
     if args.group == "data" and args.cmd == "check-own":
         return _check_own(args)
+    if args.group == "data" and args.cmd == "fetch":
+        return _fetch(args)
     print("sigfw: unknown command", file=sys.stderr)
     return 2
