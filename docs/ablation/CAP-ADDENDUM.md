@@ -1,0 +1,3 @@
+# Call cap addendum (2026-10-07)
+
+On 2026-10-07, before any A1, A2 or MCPTox-A0 result existed, the project author raised the total API call cap for the dev ablation from 400 to 1,100 (calls used so far: 98). The reason is that the full 253-row MCPTox T1/T2 `tool_description` channel is needed for the 85% detection bar in that channel to mean anything; a 30-row sample would make the interval too wide to decide. The planned calls are 253 (A0 on MCPTox) plus 351 (A1) plus 351 (A2), which is 955, so 1,053 in total with the 98 already used, and the rest of the cap is room for retries. Nothing else in `docs/ablation/PREDECLARED.md` changes: the arms, the scoring conventions, the dev bar and the selection rule stand as committed in `a1d5865`.
