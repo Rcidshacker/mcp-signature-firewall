@@ -1,0 +1,17 @@
+# Frozen measurement protocol for the 2026-10-09 kill run (ADR 0001, Amendments 1.3, 3, 4, 7 and 8).
+# Frozen 2026-10-06. Any change after the commit that adds this file makes the run a new experiment.
+# Endpoint: build.nvidia, per the model-ID contingency in Amendment 1.3 (Token Factory id not confirmed by 2026-10-06).
+
+[classifier]
+prompt_path = "prompts/classifier_v1.txt"
+prompt_sha256 = "0576e389a83460aa3f93d66df400a0d545874f74d1fbc1168c7a9e606b5e3c1c"
+model = "nvidia/nemotron-3.5-lightning-30b-a3b"
+endpoint = "nvidia"
+max_tokens = 256
+temperature = 0
+extra_body = { chat_template_kwargs = { enable_thinking = false } }
+
+[measurement]
+verdict_rule = "attack"
+error_scoring = "pessimistic"
+normalizer_version = 1
