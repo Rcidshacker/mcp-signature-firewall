@@ -143,12 +143,15 @@ def test_cli_probes_only_dev_items_and_writes_a_text_free_report(tmp_path: Path)
 
 def test_cli_reports_disagreement_and_errors(tmp_path: Path) -> None:
     calls = {"n": 0}
+    second: dict[str, int] = {}
 
     def handler(req: httpx.Request) -> httpx.Response:
         calls["n"] += 1
         if calls["n"] <= 6:
             return reply(ATTACK)
-        return reply(BENIGN if calls["n"] % 2 else "not json")  # second run: mixed benign and parse errors
+        text = json.loads(req.content)["messages"][1]["content"]  # a bad reply is asked for again, so key on the item
+        second.setdefault(text, len(second))
+        return reply(BENIGN if second[text] % 2 == 0 else "not json")  # second run: mixed benign and parse errors
 
     code, out, report, _ = run_cli(tmp_path, handler)
     assert code == 0

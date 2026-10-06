@@ -53,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:
         else:
             sub.add_argument("--confirm", action="store_true")
             sub.add_argument("--new-experiment", action="store_true")
+            sub.add_argument(
+                "--replay-from",
+                type=Path,
+                default=None,
+                help="a previous run's cache.jsonl: its valid verdicts are replayed, only the rest are asked",
+            )
             sub.add_argument("--root", type=Path, default=Path("."))
             sub.add_argument("--manifest", type=Path, default=Path("data/manifest/split_v1.json"))
             sub.add_argument("--protocol", type=Path, default=Path("protocol.toml"))
@@ -203,6 +209,7 @@ def main(
             workers=args.workers,
             confirm=args.confirm,
             new_experiment=args.new_experiment,
+            replay_from=args.replay_from,
             date=args.date,
             env=environment,
             transport=transport,

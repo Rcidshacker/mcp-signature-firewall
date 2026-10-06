@@ -11,13 +11,14 @@ import hashlib
 import json
 import re
 import threading
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from sigfw.llm import ChatClient, ChatResult, LLMError
 
-MAX_TOKENS = 256  # ADR 0001, Amendment 4
+BAD_REPLY_ATTEMPTS = 2  # a reply that fails the strict check is asked for once more (Amendment 3.5: errors after retry)
+MAX_TOKENS = 256  # ADR 0001, Amendment 4. Run 1: no valid reply needed more than 144 tokens (Amendment 9)
 OPEN_TAG = "<untrusted_text>"
 CLOSE_TAG = "</untrusted_text>"
 _FENCE_TAG = re.compile(r"<\s*/?\s*untrusted_text\s*>", re.IGNORECASE)
@@ -31,6 +32,7 @@ class Verdict:
     span: str | None = None
     error: str | None = None
     cached: bool = False
+    info: dict[str, Any] | None = field(default=None, compare=False, repr=False)  # call metadata for the run log
 
 
 class Classifier(Protocol):
@@ -159,7 +161,13 @@ class Ledger:
         with self._lock:
             self._add(ok, prompt, completion, retries)
             if self._path is not None:
-                rec = {"ok": ok, "prompt_tokens": prompt, "completion_tokens": completion, "retries_429": retries}
+                rec = {
+                    "ok": ok,
+                    "prompt_tokens": prompt,
+                    "completion_tokens": completion,
+                    "retries_429": retries,
+                    "latency_s": round(result.latency_s, 2) if result else None,
+                }
                 with self._path.open("a", encoding="utf-8", newline="\n") as f:
                     f.write(json.dumps(rec) + "\n")
 
@@ -199,13 +207,28 @@ class LlmClassifier:
         if not self._ledger.has_budget():
             self._ledger.record_blocked()
             return _error("budget exhausted")
-        try:
-            result = self._client.chat(render_messages(self._prompt.text, text), json_mode=True, max_tokens=MAX_TOKENS)
-        except LLMError as e:
-            self._ledger.record_call(None, ok=False)
-            return _error(f"llm {e.kind}")
-        verdict = parse_verdict(result.content, result.finish_reason)
-        self._ledger.record_call(result, ok=verdict.verdict != "error")
-        if verdict.verdict != "error":
-            self._cache.put(key, verdict)
-        return verdict
+        messages = render_messages(self._prompt.text, text)
+        for attempt in range(1, BAD_REPLY_ATTEMPTS + 1):
+            try:
+                result = self._client.chat(messages, json_mode=True, max_tokens=MAX_TOKENS)
+            except LLMError as e:
+                self._ledger.record_call(None, ok=False)
+                return replace(
+                    _error(f"llm {e.kind}"), info={"attempt": attempt, "llm_kind": e.kind, "detail": e.detail}
+                )
+            verdict = parse_verdict(result.content, result.finish_reason)
+            self._ledger.record_call(result, ok=verdict.verdict != "error")
+            info: dict[str, Any] = {
+                "attempt": attempt,
+                "finish": result.finish_reason,
+                "prompt_tokens": result.prompt_tokens,
+                "completion_tokens": result.completion_tokens,
+                "latency_s": round(result.latency_s, 2),
+                "http_attempts": result.attempts,
+                "retries_429": result.retries_429,
+            }
+            if verdict.verdict != "error":
+                self._cache.put(key, verdict)
+                return replace(verdict, info=info)
+            info["raw"] = result.content[:4000]  # held-out replies can quote attack text: keep this in gitignored runs/
+        return replace(verdict, info=info)

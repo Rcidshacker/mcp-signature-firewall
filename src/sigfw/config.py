@@ -23,6 +23,7 @@ class Settings:
     model: str
     api_key: str = field(repr=False)
     extra_body: dict[str, Any] = field(default_factory=dict)
+    max_rpm: float = 0.0  # requests per minute across all threads; 0 means unpaced
 
     def __str__(self) -> str:
         return repr(self)
@@ -55,10 +56,18 @@ class Settings:
             if not isinstance(parsed, dict):
                 raise ConfigError("LLM_EXTRA_BODY must be a JSON object")
             extra = parsed
+        raw_rpm = get("LLM_MAX_RPM")
+        try:
+            max_rpm = float(raw_rpm) if raw_rpm else 0.0
+        except ValueError as e:
+            raise ConfigError("LLM_MAX_RPM must be a number") from e
+        if max_rpm < 0:
+            raise ConfigError("LLM_MAX_RPM must not be negative")
         return cls(
             endpoint=endpoint,
             base_url=base.rstrip("/"),
             model=get("LLM_MODEL") or DEFAULT_MODEL,
             api_key=key,
             extra_body=extra,
+            max_rpm=max_rpm,
         )

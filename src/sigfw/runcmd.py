@@ -9,15 +9,16 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import httpx
 
 from sigfw import quoting
-from sigfw.classifier import Ledger, LlmClassifier, ReplayCache, load_prompt
+from sigfw.classifier import Ledger, LlmClassifier, ReplayCache, Verdict, load_prompt
 from sigfw.config import ConfigError, Settings
 from sigfw.datacmd import _build
 from sigfw.evalrun import (
@@ -64,6 +65,25 @@ def _append(path: Path, event: dict[str, object]) -> None:
         f.write(json.dumps(event, sort_keys=True) + "\n")
 
 
+def _run_log(run_dir: Path, total: int) -> Callable[[RunItem, Verdict], None]:
+    """One events.jsonl line per finished item: ids and call metadata, never item text. An error verdict also writes
+    its raw reply to errors.jsonl (under the gitignored runs/, because a reply can quote attack text)."""
+    seen = {"n": 0, "errors": 0}
+
+    def log(item: RunItem, v: Verdict) -> None:
+        info = {k: x for k, x in (v.info or {}).items() if k != "raw"}
+        meta = {"id": item.id, "family": item.family, "channel": item.channel, "label": item.label}
+        _append(run_dir / "events.jsonl", {**meta, "verdict": v.verdict, "cached": v.cached, "error": v.error, **info})
+        if v.verdict == "error":
+            _append(run_dir / "errors.jsonl", {"id": item.id, "error": v.error, "raw": (v.info or {}).get("raw")})
+        seen["n"] += 1
+        seen["errors"] += v.verdict == "error"
+        if seen["n"] % 25 == 0 or seen["n"] == total:
+            print(f"progress {seen['n']}/{total} errors={seen['errors']}", flush=True)
+
+    return log
+
+
 def _write_results(run_dir: Path, scored: list[Scored]) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     lines = (json.dumps({"id": s.id, "verdict": s.verdict}) for s in scored)  # ids and verdicts only, never text
@@ -101,11 +121,17 @@ def frozen_run(
     date: str | None,
     env: Mapping[str, str],
     transport: httpx.BaseTransport | None,
+    replay_from: Path | None = None,
 ) -> int:
     if not confirm:
         print("sigfw: refusing the frozen run without --confirm", file=sys.stderr)
         return 2
     protocol_path, ledger_path = _under(root, protocol_path), _under(root, ledger_path)
+    if replay_from is not None:
+        replay_from = _under(root, replay_from)
+        if not replay_from.is_file():
+            print(f"REFUSED --replay-from {replay_from} is not a file")
+            return 1
     try:
         problems = frozen_guard(root, protocol_path, env, ledger_path, new_experiment=new_experiment)
         settings = Settings.from_env(env)
@@ -154,12 +180,18 @@ def frozen_run(
             "head": _head(root),
             "protocol_sha256": protocol_sha,
             "new_experiment": new_experiment,
+            **({"replay_from_sha256": hashlib.sha256(replay_from.read_bytes()).hexdigest()} if replay_from else {}),
         },
     )
     run_dir = runs_dir / f"frozen-{started}"
+    if (
+        replay_from is not None
+    ):  # the cache key holds model, options, max_tokens and prompt sha, so only a match replays
+        run_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(replay_from, run_dir / "cache.jsonl")
     client, clf = _classifier(settings, protocol.prompt_path, run_dir, transport)
     try:
-        scored = run_items(clf, run_items_list, workers)
+        scored = run_items(clf, run_items_list, workers, on_result=_run_log(run_dir, len(run_items_list)))
     finally:
         client.close()
     _write_results(run_dir, scored)
@@ -220,7 +252,7 @@ def dev_run(
     run_dir = runs_dir / f"dev-{started}"
     client, clf = _classifier(settings, prompt_path, run_dir, transport)
     try:
-        scored = run_items(clf, items, workers)
+        scored = run_items(clf, items, workers, on_result=_run_log(run_dir, len(items)))
     finally:
         client.close()
     _write_results(run_dir, scored)

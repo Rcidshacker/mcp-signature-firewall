@@ -8,6 +8,7 @@ Never retried: other 4xx. The API key is only ever placed in the Authorization h
 from __future__ import annotations
 
 import random
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ import httpx
 
 from sigfw.config import Settings
 
-MAX_ATTEMPTS = 4
+MAX_ATTEMPTS = 6  # run 1: a stalled request timed out and the next try usually worked
 BACKOFF_BASE_S = 1.0
 BACKOFF_CAP_S = 30.0
 TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
@@ -85,6 +86,10 @@ class ChatClient:
         self._http = httpx.Client(transport=transport, timeout=TIMEOUT)
         self._sleep = sleep
         self._rng = rng
+        self._interval = 60.0 / settings.max_rpm if settings.max_rpm > 0 else 0.0
+        self._pace_lock = threading.Lock()
+        self._next_slot = 0.0
+        self._cooldown = 0.0  # grows on each 429 and decays on success; all threads wait it out together
 
     @property
     def settings(self) -> Settings:
@@ -148,6 +153,28 @@ class ChatClient:
 
     # ------------------------------------------------------------------ internals
 
+    def _pace(self) -> None:
+        """Space request starts at least 60/max_rpm seconds apart, and hold every thread during a 429 cool-down."""
+        if not self._interval and not self._next_slot:
+            return
+        with self._pace_lock:
+            now = time.monotonic()
+            start = max(now, self._next_slot)
+            self._next_slot = start + self._interval
+        if start > now:
+            self._sleep(start - now)
+
+    def _rate_limited(self, retry_after: float | None) -> None:
+        """A 429 holds all threads for the server's Retry-After, or a doubling 10 s to 60 s cool-down without one."""
+        with self._pace_lock:
+            self._cooldown = min(60.0, max(10.0, self._cooldown * 2))
+            hold = min(120.0, retry_after) if retry_after is not None else self._cooldown
+            self._next_slot = max(self._next_slot, time.monotonic() + hold)
+
+    def _succeeded(self) -> None:
+        with self._pace_lock:
+            self._cooldown = 0.0
+
     def _post(self, path: str, body: dict[str, Any]) -> tuple[dict[str, Any], float, int, int]:
         url = self._s.url(path)
         headers = {"Authorization": f"Bearer {self._s.api_key}", "Accept": "application/json"}
@@ -155,7 +182,8 @@ class ChatClient:
         retries_429 = 0
         last: LLMError | None = None
         for attempt in range(1, MAX_ATTEMPTS + 1):
-            wait: float | None = None
+            held = False  # True after a 429: the shared cool-down in _pace() does the waiting
+            self._pace()
             try:
                 resp = self._http.post(url, json=body, headers=headers)
             except httpx.TimeoutException as e:
@@ -171,11 +199,13 @@ class ChatClient:
                         raise LLMError("malformed", "response body is not JSON", status=200) from e
                     if not isinstance(data, dict):
                         raise LLMError("malformed", "response JSON is not an object", status=200)
+                    self._succeeded()
                     return data, time.perf_counter() - started, attempt, retries_429
                 detail = _scrub(resp.text, self._s.api_key)
                 if status == 429:
                     retries_429 += 1
-                    wait = _retry_after_seconds(resp)
+                    self._rate_limited(_retry_after_seconds(resp))
+                    held = True
                     last = LLMError("rate_limited", "HTTP 429", status=429, detail=detail)
                 elif status >= 500:
                     last = LLMError("server", f"HTTP {status}", status=status, detail=detail)
@@ -184,7 +214,7 @@ class ChatClient:
                     raise LLMError(kind, f"HTTP {status}", status=status, detail=detail)
             if attempt == MAX_ATTEMPTS:
                 break
-            backoff = min(BACKOFF_CAP_S, BACKOFF_BASE_S * 2 ** (attempt - 1))
-            self._sleep(min(BACKOFF_CAP_S, wait) if wait is not None else backoff * self._rng())
+            if not held:
+                self._sleep(min(BACKOFF_CAP_S, BACKOFF_BASE_S * 2 ** (attempt - 1)) * self._rng())
         assert last is not None
         raise last

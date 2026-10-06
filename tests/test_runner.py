@@ -307,6 +307,11 @@ def test_frozen_pass_writes_the_verdict_document_and_the_ledger(repo: Repo, caps
     run_dir = next((repo.root / "runs").glob("frozen-*"))
     results = (run_dir / "results.jsonl").read_text(encoding="utf-8")
     assert KEY not in results and all(set(json.loads(ln)) == {"id", "verdict"} for ln in results.splitlines())
+    log = [json.loads(ln) for ln in (run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len(log) == 262 and all(
+        {"id", "family", "label", "verdict", "finish"} <= set(e) and "raw" not in e for e in log
+    )
+    assert not (run_dir / "errors.jsonl").exists() and "progress 262/262 errors=0" in out
     assert KEY not in doc and "CANARY" not in doc
 
 
@@ -333,6 +338,9 @@ def test_a_run_with_more_than_one_percent_errors_is_invalid_and_writes_no_verdic
     out = capsys.readouterr().out
     assert "RUN_INVALID errors=3/262" in out and "KILL_VERDICT" not in out
     assert not (repo.root / "docs").exists()
+    run_dir = next((repo.root / "runs").glob("frozen-*"))
+    errors = [json.loads(ln) for ln in (run_dir / "errors.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len(errors) == 3 and all(e["error"] and "raw" in e for e in errors)  # why each one failed is on record
     events = [
         json.loads(ln) for ln in (repo.root / "data" / "frozen_runs.jsonl").read_text(encoding="utf-8").splitlines()
     ]
@@ -407,3 +415,31 @@ def test_dev_run_scores_dev_items_and_never_writes_a_verdict_document(
     assert code == 0 and "DEV_DONE" in out and "KILL_VERDICT" not in out
     assert "dev quoting: flagged 0/50" in out
     assert not (repo.root / "docs").exists() and not (repo.root / "data" / "frozen_runs.jsonl").exists()
+
+
+def test_replay_from_asks_again_only_for_the_items_without_a_valid_cached_verdict(
+    repo: Repo, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert repo.frozen(handler_for(repo, unauthorized=2), "--confirm") == 0  # 2 errors of 262: valid but not clean
+    commit(repo.root, "first frozen run")
+    first_cache = next((repo.root / "runs").glob("frozen-*")) / "cache.jsonl"
+    calls = {"n": 0}
+    base = handler_for(repo)
+
+    def counting(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return base(req)
+
+    assert repo.frozen(counting, "--confirm", "--new-experiment", "--replay-from", str(first_cache)) == 0
+    assert calls["n"] == 2  # only the two items that errored the first time
+    assert "errors: 0 of 262" in verdict_doc(repo, f"verdict-{DATE}-2.md")
+    start = [json.loads(ln) for ln in (repo.root / "data" / "frozen_runs.jsonl").read_text("utf-8").splitlines()][-2]
+    assert start["event"] == "start" and len(start["replay_from_sha256"]) == 64
+
+
+def test_replay_from_a_missing_file_is_refused_before_anything_starts(
+    repo: Repo, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert repo.frozen(handler_for(repo), "--confirm", "--replay-from", str(repo.root / "nope.jsonl")) == 1
+    assert "is not a file" in capsys.readouterr().out
+    assert not (repo.root / "data" / "frozen_runs.jsonl").exists()

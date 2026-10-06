@@ -71,3 +71,14 @@ def test_extra_body_is_parsed_from_json_env() -> None:
 def test_extra_body_must_be_a_json_object(raw: str) -> None:
     with pytest.raises(ConfigError, match="LLM_EXTRA_BODY"):
         Settings.from_env({"NVIDIA_API_KEY": KEY, "LLM_EXTRA_BODY": raw})
+
+
+def test_max_rpm_defaults_to_unpaced_and_parses_a_number() -> None:
+    assert Settings.from_env({"NVIDIA_API_KEY": KEY}).max_rpm == 0.0
+    assert Settings.from_env({"NVIDIA_API_KEY": KEY, "LLM_MAX_RPM": "30"}).max_rpm == 30.0
+
+
+@pytest.mark.parametrize("raw", ["fast", "-5"])
+def test_max_rpm_must_be_a_non_negative_number(raw: str) -> None:
+    with pytest.raises(ConfigError, match="LLM_MAX_RPM"):
+        Settings.from_env({"NVIDIA_API_KEY": KEY, "LLM_MAX_RPM": raw})

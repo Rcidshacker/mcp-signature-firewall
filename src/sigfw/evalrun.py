@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import json
 import subprocess
-from collections.abc import Mapping
+import threading
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from sigfw.classifier import MAX_TOKENS, Classifier, load_prompt
+from sigfw.classifier import MAX_TOKENS, Classifier, Verdict, load_prompt
 from sigfw.config import Settings
 from sigfw.items import Item
 from sigfw.metrics import FrozenResult, Scored
@@ -43,12 +44,26 @@ def quoting_run_items(rows: list[Row]) -> list[RunItem]:
     return [RunItem(f"quoting/{r.id}", "quoting", r.channel, "benign", r.author, r.text) for r in rows]
 
 
-def run_items(classifier: Classifier, items: list[RunItem], workers: int = 1) -> list[Scored]:
-    """Classify every item once, in order. The classifier turns every failure into an error verdict, never benign."""
+def run_items(
+    classifier: Classifier,
+    items: list[RunItem],
+    workers: int = 1,
+    on_result: Callable[[RunItem, Verdict], None] | None = None,
+) -> list[Scored]:
+    """Classify every item once, in order. The classifier turns every failure into an error verdict, never benign.
+
+    `on_result` is called (one thread at a time) as each item finishes, so a run log survives an interrupted run."""
+    lock = threading.Lock()
 
     def one(item: RunItem) -> Scored:
-        verdict = classifier.classify(item.text).verdict
-        return Scored(item.id, item.family, item.channel, item.label, item.author, verdict)
+        try:
+            v = classifier.classify(item.text)
+        except Exception as e:  # noqa: BLE001 - one bad item must not kill a 700-item run; it is scored as an error
+            v = Verdict("error", error=f"unexpected {type(e).__name__}")
+        if on_result is not None:
+            with lock:
+                on_result(item, v)
+        return Scored(item.id, item.family, item.channel, item.label, item.author, v.verdict)
 
     if workers <= 1:
         return [one(i) for i in items]

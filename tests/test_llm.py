@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from sigfw.config import Settings
-from sigfw.llm import ChatClient, LLMError
+from sigfw.llm import MAX_ATTEMPTS, ChatClient, LLMError
 
 KEY = "nvapi" + "-CANARY0123456789abcdefghijklmnopqrstuvwxyz"  # split so the repo key scan stays meaningful
 SETTINGS = Settings.from_env({"NVIDIA_API_KEY": KEY, "NVIDIA_BASE_URL": "https://llm.test/v1/"})
@@ -79,7 +79,7 @@ def test_429_then_success_honours_retry_after_seconds() -> None:
     client, sleeps = make_client(handler)
     r = client.chat([{"role": "user", "content": "hi"}])
     assert r.attempts == 2 and r.retries_429 == 1
-    assert sleeps == [7.0]
+    assert len(sleeps) == 1 and 6.9 < sleeps[0] <= 7.0  # the shared cool-down waits out Retry-After
 
 
 def test_5xx_is_retried_with_capped_exponential_backoff() -> None:
@@ -100,7 +100,7 @@ def test_gives_up_after_max_attempts_with_a_typed_error() -> None:
     with pytest.raises(LLMError) as ei:
         client.chat([{"role": "user", "content": "hi"}])
     assert ei.value.kind == "rate_limited"
-    assert len(sleeps) == 3  # 4 attempts -> 3 sleeps
+    assert len(sleeps) == MAX_ATTEMPTS - 1
 
 
 @pytest.mark.parametrize(("status", "kind"), [(400, "bad_request"), (401, "auth"), (403, "auth"), (404, "not_found")])
@@ -126,7 +126,7 @@ def test_timeouts_are_retried_then_reported() -> None:
     with pytest.raises(LLMError) as ei:
         client.chat([{"role": "user", "content": "hi"}])
     assert ei.value.kind == "timeout"
-    assert len(sleeps) == 3
+    assert len(sleeps) == MAX_ATTEMPTS - 1
 
 
 def test_empty_content_with_length_finish_is_returned_not_raised() -> None:
@@ -209,3 +209,34 @@ def test_extra_body_cannot_override_the_pinned_fields() -> None:
     client.chat([{"role": "user", "content": "hi"}], extra_body={"temperature": 1, "model": "other", "messages": []})
     assert seen[0]["temperature"] == 0 and seen[0]["model"] == SETTINGS.model
     assert seen[0]["messages"] == [{"role": "user", "content": "hi"}]
+
+
+def test_max_rpm_spaces_request_starts_across_calls() -> None:
+    sleeps: list[float] = []
+    paced = Settings.from_env({"NVIDIA_API_KEY": KEY, "LLM_MAX_RPM": "60"})  # one request a second
+    body = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}], "usage": {}}
+    client = ChatClient(
+        paced, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body)), sleep=sleeps.append
+    )
+    for _ in range(3):
+        client.chat([{"role": "user", "content": "hi"}])
+    assert len(sleeps) == 2 and 0.9 < sleeps[0] <= 1.0 and 1.9 < sleeps[1] <= 2.0  # the first call goes at once
+
+
+def test_unpaced_by_default_means_no_sleep() -> None:
+    client, sleeps = make_client(lambda _: httpx.Response(200, json={"choices": [{"message": {"content": "x"}}]}))
+    client.chat([{"role": "user", "content": "hi"}])
+    assert sleeps == []
+
+
+def test_a_429_without_retry_after_holds_the_next_request_for_a_growing_cool_down() -> None:
+    calls = {"n": 0}
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(429, json={}) if calls["n"] <= 2 else httpx.Response(200, json=OK_BODY)
+
+    client, sleeps = make_client(handler)
+    r = client.chat([{"role": "user", "content": "hi"}])
+    assert r.attempts == 3 and r.retries_429 == 2
+    assert 9.9 < sleeps[0] <= 10.0 and 19.9 < sleeps[1] <= 20.0  # 10 s, then doubled

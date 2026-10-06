@@ -27,7 +27,7 @@ from sigfw.classifier import (
     render_messages,
 )
 from sigfw.config import Settings
-from sigfw.llm import ChatClient
+from sigfw.llm import MAX_ATTEMPTS, ChatClient
 from sigfw.protocol import ProtocolError, load_protocol
 
 KEY = "nvapi" + "-CANARY0123456789abcdefghijklmnopqrstuvwxyz"  # split so the repo key scan stays meaningful
@@ -175,7 +175,7 @@ def test_persistent_429_becomes_an_error_verdict_not_an_exception() -> None:
     rig = Rig(lambda _: httpx.Response(429, json={}))
     v = rig.clf.classify("x")
     assert v.verdict == "error" and "rate_limited" in (v.error or "")
-    assert len(rig.requests) == 4  # MAX_ATTEMPTS
+    assert len(rig.requests) == MAX_ATTEMPTS
     assert rig.ledger.snapshot()["errors"] == 1
 
 
@@ -188,7 +188,7 @@ def test_429_with_retry_after_then_success_honours_the_wait_and_is_counted() -> 
 
     rig = Rig(handler)
     assert rig.clf.classify("x").verdict == "benign"
-    assert rig.sleeps == [7.0]
+    assert len(rig.sleeps) == 1 and 6.9 < rig.sleeps[0] <= 7.0
     snap = rig.ledger.snapshot()
     assert snap["calls"] == 1 and snap["retries_429"] == 1 and snap["errors"] == 0
 
@@ -228,11 +228,40 @@ def test_cache_key_covers_text_prompt_model_and_extra_body() -> None:
 
 
 def test_errors_are_not_cached() -> None:
-    answers = iter([reply("garbage"), reply(BENIGN)])
+    answers = iter([reply("garbage"), reply("garbage"), reply(BENIGN)])
     rig = Rig(lambda _: next(answers))
-    assert rig.clf.classify("x").verdict == "error"
+    assert rig.clf.classify("x").verdict == "error"  # the bad reply was asked for twice
     assert rig.clf.classify("x").verdict == "benign"  # asked again, not replayed
+    assert len(rig.requests) == 3
+
+
+def test_a_bad_reply_is_asked_for_once_more_and_the_good_second_reply_counts() -> None:
+    answers = iter([reply("not json at all"), reply(ATTACK)])
+    rig = Rig(lambda _: next(answers))
+    v = rig.clf.classify("x")
+    assert v.verdict == "attack" and v.info is not None and v.info["attempt"] == 2
+    assert len(rig.requests) == 2 and rig.ledger.snapshot()["calls"] == 2 and rig.ledger.snapshot()["errors"] == 1
+
+
+def test_two_bad_replies_are_one_error_with_the_raw_reply_in_its_info() -> None:
+    rig = Rig(lambda _: reply("not json at all"))
+    v = rig.clf.classify("x")
+    assert v.verdict == "error" and v.error == "reply is not JSON"
+    assert v.info is not None and v.info["raw"] == "not json at all" and v.info["attempt"] == 2
     assert len(rig.requests) == 2
+
+
+def test_a_good_verdict_carries_call_metadata_but_not_the_raw_reply() -> None:
+    rig = Rig(lambda _: reply(BENIGN))
+    info = rig.clf.classify("x").info
+    assert info is not None and "raw" not in info
+    assert info["finish"] == "stop" and info["completion_tokens"] == 7 and info["attempt"] == 1 and "latency_s" in info
+
+
+def test_a_transport_failure_is_not_asked_again_by_the_classifier() -> None:
+    rig = Rig(lambda _: httpx.Response(401, json={}))
+    v = rig.clf.classify("x")
+    assert v.info is not None and v.info["llm_kind"] == "auth" and len(rig.requests) == 1
 
 
 def test_cache_persists_across_instances_and_tolerates_a_torn_last_line(tmp_path: Path) -> None:
