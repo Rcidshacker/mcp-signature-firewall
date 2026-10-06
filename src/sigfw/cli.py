@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from sigfw import datacmd, draftcmd, evalcmd, runcmd
+from sigfw import datacmd, draftcmd, evalcmd, reviewpage, runcmd
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
@@ -83,6 +83,9 @@ def _build_parser() -> argparse.ArgumentParser:
     rq.add_argument("--ledger", type=Path, default=Path("var/drafts/ledger.jsonl"))
     rq.add_argument("--dir", type=Path, default=Path("data/own"))
     rq.add_argument("--log", type=Path, default=Path("data/own/quoting_review_log.jsonl"))
+    rq.add_argument("--web", action="store_true", help="review in a local browser page instead of the terminal")
+    rq.add_argument("--port", type=int, default=8765)
+    rq.add_argument("--no-browser", action="store_true")
     add = data.add_parser("add-own", help="append one author=human shadowing row from typed answers")
     add.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
     fetch = data.add_parser("fetch", help="download the pinned third-party datasets into data/raw (gitignored)")
@@ -233,6 +236,8 @@ def main(
             transport=transport,
         )
     if args.group == "data" and args.cmd == "review-quoting":
+        if args.web:
+            return reviewpage.serve(args.staging, args.dir, args.log, args.port, open_browser=not args.no_browser)
         return draftcmd.review(staging=args.staging, own_dir=args.dir, log_path=args.log, ledger_path=args.ledger)
     if args.group == "data" and args.cmd == "add-own":
         return datacmd.add_own(args.path)

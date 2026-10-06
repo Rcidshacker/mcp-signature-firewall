@@ -272,7 +272,7 @@ def test_the_committed_template_files_are_valid_and_never_count() -> None:
             continue
         rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
         template = [r for r in rows if str(r["id"]).startswith("TEMPLATE")]
-        assert len(template) == 2 and all(
+        assert len(template) in (0, 2) and all(  # the template rows were removed once real rows were committed
             r["slice"] == slice_name and r["text"].startswith("TEMPLATE") for r in template
         )
 

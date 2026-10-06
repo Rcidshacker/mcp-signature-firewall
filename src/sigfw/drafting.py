@@ -261,19 +261,26 @@ def review(
             reason = _ask_choice(ask, show, reason_prompt, REJECT_REASONS) if choice == "r" else None
         except EOFError:
             break
-        entry = {"id": row["id"], "slice": row["slice"]}
-        if reason is not None:
-            _log(log_path, {**entry, "decision": "reject", "reason": REJECT_REASONS[reason]})
+        apply_decision(row, REJECT_REASONS[reason] if reason is not None else None, own_dir, log_path)
+        if reason is None:
+            accepted += 1
+        else:
             rejected += 1
-            continue
-        target = own_dir / f"quoting_{row['slice']}.jsonl"
-        existing = target.read_bytes() if target.exists() else b""
-        prefix = "\n" if existing and not existing.endswith(b"\n") else ""
-        with target.open("a", encoding="utf-8", newline="\n") as f:
-            f.write(prefix + json.dumps({**row, "reviewed": True}, ensure_ascii=False) + "\n")
-        _log(log_path, {**entry, "decision": "accept", "reason": None})
-        accepted += 1
     return accepted, rejected, len(pending) - accepted - rejected
+
+
+def apply_decision(row: dict[str, Any], reason: str | None, own_dir: Path, log_path: Path) -> None:
+    """Record one human decision: a reject (reason is a REJECT_REASONS value) or an accept (reason None)."""
+    entry = {"id": row["id"], "slice": row["slice"]}
+    if reason is not None:
+        _log(log_path, {**entry, "decision": "reject", "reason": reason})
+        return
+    target = own_dir / f"quoting_{row['slice']}.jsonl"
+    existing = target.read_bytes() if target.exists() else b""
+    prefix = "\n" if existing and not existing.endswith(b"\n") else ""
+    with target.open("a", encoding="utf-8", newline="\n") as f:
+        f.write(prefix + json.dumps({**row, "reviewed": True}, ensure_ascii=False) + "\n")
+    _log(log_path, {**entry, "decision": "accept", "reason": None})
 
 
 def _log(path: Path, entry: dict[str, Any]) -> None:
