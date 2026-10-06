@@ -1,0 +1,8 @@
+{
+ "arm": "A0-mcptox",
+ "mode": "strict",
+ "set": "mcptox",
+ "prompt_sha256": "0576e389a83460aa3f93d66df400a0d545874f74d1fbc1168c7a9e606b5e3c1c",
+ "api_calls": 254,
+ "calls_used_total": 352
+}

@@ -1,0 +1,8 @@
+{
+ "arm": "A1",
+ "mode": "strict",
+ "set": "all",
+ "prompt_sha256": "28da07837d79c1e5599f05c6784ad2b090f9f06bd9aaad15ed8a54a751892ba8",
+ "api_calls": 352,
+ "calls_used_total": 704
+}

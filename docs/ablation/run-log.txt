@@ -1,0 +1,30 @@
+data/raw/injecagent/test_cases_dh_base.json
+data/raw/injecagent/test_cases_dh_enhanced.json
+data/raw/injecagent/test_cases_ds_base.json
+data/raw/injecagent/test_cases_ds_enhanced.json
+data/own/quoting_dev.jsonl
+prompts/classifier_v1.txt
+data/raw/mcptox/pure_tool.json  (pure_tool.json loaded into memory by a key-based splitter; non-T1/T2 rows discarded before any inspection, logging, writing, or model call.)
+  row counts by paradigm key: {"kept_mcptox_t1": 76, "kept_mcptox_t2": 177, "seen_Template-1": 77, "seen_Template-2": 183, "seen_Template-3": 225}
+data/manifest/split_v1.json  (ids only)
+data/raw/mcptox/dev_t1_t2.jsonl  (written)
+verified equal to a1d5865: prompts/ablation/A1.txt, prompts/ablation/A2.txt, src/sigfw/spanverdict.py
+data/raw/mcptox/dev_t1_t2.jsonl
+prompts/classifier_v1.txt
+verified equal to a1d5865: prompts/ablation/A1.txt, prompts/ablation/A2.txt, src/sigfw/spanverdict.py
+data/raw/mcptox/dev_t1_t2.jsonl
+data/raw/injecagent/test_cases_dh_base.json
+data/raw/injecagent/test_cases_dh_enhanced.json
+data/raw/injecagent/test_cases_ds_base.json
+data/raw/injecagent/test_cases_ds_enhanced.json
+data/own/quoting_dev.jsonl
+prompts/ablation/A1.txt
+verified equal to a1d5865: prompts/ablation/A1.txt, prompts/ablation/A2.txt, src/sigfw/spanverdict.py
+data/raw/mcptox/dev_t1_t2.jsonl
+data/raw/injecagent/test_cases_dh_base.json
+data/raw/injecagent/test_cases_dh_enhanced.json
+data/raw/injecagent/test_cases_ds_base.json
+data/raw/injecagent/test_cases_ds_enhanced.json
+data/own/quoting_dev.jsonl
+prompts/ablation/A2.txt
+data/own/quoting_dev.jsonl
