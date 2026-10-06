@@ -7,7 +7,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G1: all tests pass
   CHECK: uv run python scripts/gates.py tests
   EXPECT: TESTS_OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=8be296e4c6ac475680d52d09fb266a0302819b6f3592f911f23a299c1084490c; output-bytes=33; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=9af1ac2c55db5eb2917c9ee659a5f68cd1cc6bd56f77d08379fdaca97d17ce72; exit=0; EXPECT=matched; output-sha256=e73a7ce9564cb6d3464fa0251a353e8f9965a5dd948a8694fcb7751c67548d11; output-bytes=44; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G2: lint clean
   CHECK: uv run ruff check .
@@ -17,7 +17,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
 - [x] G3: types clean
   CHECK: uv run mypy src tests
   EXPECT: Success: no issues found
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=706935f02fed95e8e0241ec13fa86be727783ee491ba3e8e4470ceaeed6232d8; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4c7be1d20988aac3f095e787d5ea87bde7ba8f13b4144e5b8b20200365cebe79; exit=0; EXPECT=matched; output-sha256=a80b610afc3dd88bd2cb560038e703b689af1bc765f77d96ad3a558d949348bf; output-bytes=45; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
 - [x] G4: pre-registered Wilson values reproduce
   CHECK: uv run python -c "from sigfw.stats import wilson_upper as w; print('WILSON', [round(w(a, b) * 100, 2) for a, b in [(6, 200), (7, 200), (12, 300), (13, 300)]])"
@@ -49,7 +49,7 @@ Scope: the repository installs, lints, type-checks and tests clean, the pre-regi
   EXPECT: /shadowing n=(3[5-9]|[4-9][0-9])/
   EVIDENCE: automatic-evidence=v1; definition-sha256=96f974f608675a4bab8dac9688e1ff0339735250c794e586faf3a641012cf30d; exit=0; EXPECT=matched; output-sha256=4dd569616150e53000a39be0a8a1d9699978164f196f44bf987ca8b29d9c12d6; output-bytes=580; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\Lenovo\Desktop\Code\2026\mcp-signature-firewall; path=60bee5be6be7/50 entries
 
-- [ ] G10: the protocol check enforces the ordering and passes [pending M4: `sigfw eval protocol --check` fails unless G8 and G11 hold]
+- [ ] G10: the protocol check enforces the ordering and passes [unmet until protocol.toml is frozen: `sigfw eval protocol --check` also fails unless G8 and G11 hold]
   CHECK: uv run sigfw eval protocol --check
   EXPECT: PROTOCOL_OK
 

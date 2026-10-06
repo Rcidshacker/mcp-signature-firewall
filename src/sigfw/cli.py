@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from sigfw import datacmd, draftcmd, evalcmd
+from sigfw import datacmd, draftcmd, evalcmd, runcmd
 from sigfw.config import ConfigError, Settings
 from sigfw.llm import ChatClient
 from sigfw.owndata import check_shadowing
@@ -37,6 +37,28 @@ def _build_parser() -> argparse.ArgumentParser:
     dp.add_argument("--date", default=None)
     dp.add_argument("--raw", type=Path, default=Path("data/raw"))
     dp.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
+    pc = ev.add_parser("protocol", help="check protocol.toml against the prompt, settings and the G8/G11 orderings")
+    pc.add_argument("--check", action="store_true", required=True)
+    pc.add_argument("--root", type=Path, default=Path("."))
+    pc.add_argument("--protocol", type=Path, default=Path("protocol.toml"))
+    for name, text in (("dev", "dev items through the classifier (no verdict)"), ("frozen", "the guarded frozen run")):
+        sub = ev.add_parser(name, help=text)
+        sub.add_argument("--raw", type=Path, default=Path("data/raw"))
+        sub.add_argument("--shadowing", type=Path, default=Path("data/own/shadowing.jsonl"))
+        sub.add_argument("--dir", type=Path, default=Path("data/own"))
+        sub.add_argument("--runs", type=Path, default=Path("runs"))
+        sub.add_argument("--workers", type=int, default=4)
+        if name == "dev":
+            sub.add_argument("--prompt", type=Path, required=True)
+        else:
+            sub.add_argument("--confirm", action="store_true")
+            sub.add_argument("--new-experiment", action="store_true")
+            sub.add_argument("--root", type=Path, default=Path("."))
+            sub.add_argument("--manifest", type=Path, default=Path("data/manifest/split_v1.json"))
+            sub.add_argument("--protocol", type=Path, default=Path("protocol.toml"))
+            sub.add_argument("--ledger", type=Path, default=Path("data/frozen_runs.jsonl"))
+            sub.add_argument("--docs", type=Path, default=Path("docs"))
+            sub.add_argument("--date", default=None)
     data = top.add_parser("data", help="dataset tools").add_subparsers(dest="cmd", required=True)
     own = data.add_parser("check-own", help="validate the hand-written shadowing set")
     own.add_argument("--path", type=Path, default=Path("data/own/shadowing.jsonl"))
@@ -151,6 +173,37 @@ def main(
         return _probe_models(args, environment, transport)
     if args.group == "data" and args.cmd == "check-own":
         return _check_own(args)
+    if args.group == "eval" and args.cmd == "protocol":
+        return runcmd.protocol_check(args.root, args.protocol, environment)
+    if args.group == "eval" and args.cmd == "dev":
+        return runcmd.dev_run(
+            raw=args.raw,
+            shadowing=args.shadowing,
+            own_dir=args.dir,
+            prompt_path=args.prompt,
+            runs_dir=args.runs,
+            workers=args.workers,
+            env=environment,
+            transport=transport,
+        )
+    if args.group == "eval" and args.cmd == "frozen":
+        return runcmd.frozen_run(
+            root=args.root,
+            raw=args.raw,
+            shadowing=args.shadowing,
+            manifest_path=args.manifest,
+            protocol_path=args.protocol,
+            own_dir=args.dir,
+            ledger_path=args.ledger,
+            runs_dir=args.runs,
+            docs_dir=args.docs,
+            workers=args.workers,
+            confirm=args.confirm,
+            new_experiment=args.new_experiment,
+            date=args.date,
+            env=environment,
+            transport=transport,
+        )
     if args.group == "eval" and args.cmd == "dev-probe":
         return evalcmd.dev_probe(
             raw=args.raw,
