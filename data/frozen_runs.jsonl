@@ -1,0 +1,2 @@
+{"event": "start", "head": "634d71bd83d111885631db6e6d772a29e1ea9057", "new_experiment": false, "protocol_sha256": "2c037c4872f45e401458c7438e9c791f8e69b061e61843357064bf5556e77412", "utc": "20261006T153041Z"}
+{"errors": 16, "event": "finish", "n": 725, "verdict": "INVALID"}
